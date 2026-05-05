@@ -42,7 +42,9 @@ describe('getResolvedConfig with designSystem', () => {
     // The manifest's preset should appear in resolved.presets
     expect(resolved.presets).toBeDefined()
     expect(Array.isArray(resolved.presets)).toBe(true)
-    expect(resolved.presets!.length).toBeGreaterThan(0)
+    // The manifest's preset must be in the resolved presets list
+    const presetNames = resolved.presets!.map((p: any) => p.name).filter(Boolean)
+    expect(presetNames).toContain('@panda-test/valid-lib/preset')
   })
 
   test('concatenates manifest importMap into the consumer config', async () => {
@@ -96,5 +98,16 @@ describe('getResolvedConfig with designSystem', () => {
 
     const tokens = resolved.theme?.extend?.tokens || resolved.theme?.tokens
     expect((tokens as any)?.colors?.libBrand?.value).toBe('#ff00ff')
+  })
+
+  test('throws when designSystem points to a package without a manifest', async () => {
+    const config = {
+      designSystem: '@panda-test/no-manifest',
+      include: [],
+    }
+
+    await expect(getResolvedConfig(config as any, tmpRoot)).rejects.toThrow(
+      /Cannot resolve '@panda-test\/no-manifest\/panda\.lib\.json'/,
+    )
   })
 })
