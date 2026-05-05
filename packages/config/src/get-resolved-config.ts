@@ -15,7 +15,21 @@ const hookUtils = {
 }
 
 /** Known top-level keys that appear on a Preset/Config object. */
-const PRESET_KEYS = new Set(['name', 'theme', 'conditions', 'utilities', 'patterns', 'presets', 'globalCss', 'layers'])
+const PRESET_KEYS = new Set([
+  'name',
+  'theme',
+  'conditions',
+  'utilities',
+  'patterns',
+  'presets',
+  'globalCss',
+  'globalVars',
+  'globalFontface',
+  'globalPositionTry',
+  'staticCss',
+  'themes',
+  'layers',
+])
 
 /**
  * When a preset file only has named exports (no default export), `bundle` returns the entire
