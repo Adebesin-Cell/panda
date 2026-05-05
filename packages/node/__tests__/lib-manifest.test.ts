@@ -1,17 +1,20 @@
-import { mkdirSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { readLibManifest } from '../src/lib-manifest'
 
-const fixtureCwd = join(__dirname, 'fixtures/lib-manifest')
-const nodeModules = join(fixtureCwd, 'node_modules', '@panda-test')
+const fixtureDir = join(__dirname, 'fixtures/lib-manifest')
+let tmpRoot: string
 
 beforeAll(() => {
+  tmpRoot = mkdtempSync(join(tmpdir(), 'panda-lib-manifest-'))
+  const nodeModules = join(tmpRoot, 'node_modules', '@panda-test')
   mkdirSync(nodeModules, { recursive: true })
   const link = (pkg: string, target: string) => {
     const dest = join(nodeModules, pkg)
     try {
-      symlinkSync(join(fixtureCwd, target), dest)
+      symlinkSync(join(fixtureDir, target), dest)
     } catch (e: any) {
       if (e.code !== 'EEXIST') throw e
     }
@@ -24,12 +27,12 @@ beforeAll(() => {
 })
 
 afterAll(() => {
-  rmSync(join(fixtureCwd, 'node_modules'), { recursive: true, force: true })
+  rmSync(tmpRoot, { recursive: true, force: true })
 })
 
 describe('readLibManifest', () => {
   test('resolves a valid manifest from a package', () => {
-    const result = readLibManifest('@panda-test/valid-lib', fixtureCwd)
+    const result = readLibManifest('@panda-test/valid-lib', tmpRoot)
     expect(result.manifest.name).toBe('@panda-test/valid-lib')
     expect(result.manifest.schemaVersion).toBe(1)
     expect(result.manifest.preset).toBe('./preset.js')
@@ -37,24 +40,24 @@ describe('readLibManifest', () => {
   })
 
   test('throws when the package cannot be resolved', () => {
-    expect(() => readLibManifest('@panda-test/does-not-exist', fixtureCwd)).toThrow(
+    expect(() => readLibManifest('@panda-test/does-not-exist', tmpRoot)).toThrow(
       /Cannot resolve '@panda-test\/does-not-exist\/panda\.lib\.json'/,
     )
   })
 
   test('throws when the package has no panda.lib.json export', () => {
-    expect(() => readLibManifest('@panda-test/no-manifest', fixtureCwd)).toThrow(/Cannot resolve/)
+    expect(() => readLibManifest('@panda-test/no-manifest', tmpRoot)).toThrow(/Cannot resolve/)
   })
 
   test('throws on malformed json', () => {
-    expect(() => readLibManifest('@panda-test/malformed', fixtureCwd)).toThrow(/Invalid JSON/)
+    expect(() => readLibManifest('@panda-test/malformed', tmpRoot)).toThrow(/Invalid JSON/)
   })
 
   test('throws when required fields are missing', () => {
-    expect(() => readLibManifest('@panda-test/incomplete', fixtureCwd)).toThrow(/missing required field 'version'/)
+    expect(() => readLibManifest('@panda-test/incomplete', tmpRoot)).toThrow(/missing required field 'version'/)
   })
 
   test("throws when 'schemaVersion' is not an integer", () => {
-    expect(() => readLibManifest('@panda-test/wrong-type', fixtureCwd)).toThrow(/'schemaVersion' must be an integer/)
+    expect(() => readLibManifest('@panda-test/wrong-type', tmpRoot)).toThrow(/'schemaVersion' must be an integer/)
   })
 })
