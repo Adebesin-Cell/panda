@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "one",
+  "name": "@panda-test/wrong-type",
+  "version": "1.0.0",
+  "panda": "^2.0.0",
+  "preset": "./preset.js",
+  "importMap": {},
+  "buildinfo": "./panda.buildinfo.json"
+}
