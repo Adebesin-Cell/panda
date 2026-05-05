@@ -14,6 +14,29 @@ const hookUtils = {
   traverse,
 }
 
+/** Known top-level keys that appear on a Preset/Config object. */
+const PRESET_KEYS = new Set(['name', 'theme', 'conditions', 'utilities', 'patterns', 'presets', 'globalCss', 'layers'])
+
+/**
+ * When a preset file only has named exports (no default export), `bundle` returns the entire
+ * module object (e.g. `{ leafPreset: <Preset> }`). This helper detects that case and extracts
+ * the first value that looks like a preset.
+ */
+function extractPresetFromModule(mod: unknown): ExtendableConfig {
+  if (!mod || typeof mod !== 'object') return mod as ExtendableConfig
+  const obj = mod as Record<string, unknown>
+  // If the object itself looks like a preset (has at least one known key), use it directly.
+  if (Object.keys(obj).some((k) => PRESET_KEYS.has(k))) return obj as ExtendableConfig
+  // Otherwise, assume it's a module namespace — return the first value that looks like a preset.
+  for (const val of Object.values(obj)) {
+    if (val && typeof val === 'object' && Object.keys(val as object).some((k) => PRESET_KEYS.has(k))) {
+      return val as ExtendableConfig
+    }
+  }
+  // Fallback: return as-is
+  return obj as ExtendableConfig
+}
+
 /**
  * Recursively merge all presets into a single config (depth-first using stack)
  */
@@ -26,7 +49,10 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
 
     // Bundle and load the preset module
     const presetModule = await bundle(presetPath, cwd)
-    const designSystemPreset = presetModule.config
+    // `bundle` returns `mod?.default ?? mod`. If the file only has named exports (no default),
+    // the result is the whole module object, e.g. { leafPreset: <Preset> }. In that case we
+    // pick the first value that looks like a preset/config (has at least one known preset key).
+    const designSystemPreset = extractPresetFromModule(presetModule.config)
 
     // Prepend to the consumer's presets so it's in the stack
     config.presets = [designSystemPreset, ...(config.presets ?? [])]
