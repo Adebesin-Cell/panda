@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "@panda-test/valid-lib",
+  "version": "1.0.0",
+  "panda": "^2.0.0",
+  "preset": "./preset.js",
+  "importMap": {
+    "css": "@panda-test/valid-lib/css",
+    "recipes": "@panda-test/valid-lib/recipes"
+  },
+  "buildinfo": "./panda.buildinfo.json"
+}
