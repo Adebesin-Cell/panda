@@ -55,4 +55,23 @@ describe('createContext with designSystem', () => {
   test('warns gracefully when buildinfo is missing', () => {
     expect(() => new PandaContext(makeConf('@panda-test/broken-buildinfo'))).not.toThrow()
   })
+
+  test('warns gracefully when designSystem package cannot be resolved', () => {
+    const conf: any = {
+      config: {
+        cwd: tmpRoot,
+        designSystem: '@panda-test/does-not-exist',
+        include: [],
+        outdir: 'styled-system',
+      },
+      tsconfig: {},
+      hooks: {},
+      dependencies: [],
+      path: '',
+      serialized: '',
+      deserialize: () => ({}),
+    }
+
+    expect(() => new PandaContext(conf)).not.toThrow()
+  })
 })
