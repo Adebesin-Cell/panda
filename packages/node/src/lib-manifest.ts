@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { isObject } from '@pandacss/shared'
 import type { LibManifest } from '@pandacss/types'
 
 export interface ReadLibManifestResult {
@@ -95,8 +96,4 @@ function validate(value: unknown, path: string): LibManifest {
   }
 
   return v as unknown as LibManifest
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
