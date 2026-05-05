@@ -1,10 +1,10 @@
 import type { StyleEncoder, Stylesheet } from '@pandacss/core'
-import { readLibManifest } from '@pandacss/config'
+import { readLibManifest, type ReadLibManifestResult } from '@pandacss/config'
 import { Generator } from '@pandacss/generator'
 import { logger } from '@pandacss/logger'
 import { ParserResult, Project } from '@pandacss/parser'
 import { uniq } from '@pandacss/shared'
-import type { LoadConfigResult, Runtime, WatchOptions, WatcherEventType } from '@pandacss/types'
+import type { EncoderJson, LoadConfigResult, Runtime, WatchOptions, WatcherEventType } from '@pandacss/types'
 import { readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
 import { debounce } from 'perfect-debounce'
@@ -54,8 +54,19 @@ export class PandaContext extends Generator {
   }
 
   private hydrateDesignSystemEncoder(packageName: string) {
-    const cwd = this.config.cwd as string
-    const { manifest, manifestPath } = readLibManifest(packageName, cwd)
+    const cwd = this.config.cwd ?? this.runtime.cwd()
+
+    let manifestResult: ReadLibManifestResult
+    try {
+      manifestResult = readLibManifest(packageName, cwd)
+    } catch (error) {
+      logger.warn(
+        'designSystem',
+        `Could not load manifest for '${packageName}': ${(error as Error).message}. Skipping buildinfo hydration.`,
+      )
+      return
+    }
+    const { manifest, manifestPath } = manifestResult
 
     const buildinfoPath = isAbsolute(manifest.buildinfo)
       ? manifest.buildinfo
@@ -80,7 +91,7 @@ export class PandaContext extends Generator {
       return
     }
 
-    this.parserOptions.encoder.fromJSON(parsed as any)
+    this.parserOptions.encoder.fromJSON(parsed as EncoderJson)
   }
 
   private getExplicitDependencies = () => {
