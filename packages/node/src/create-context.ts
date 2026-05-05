@@ -1,9 +1,12 @@
 import type { StyleEncoder, Stylesheet } from '@pandacss/core'
+import { readLibManifest } from '@pandacss/config'
 import { Generator } from '@pandacss/generator'
 import { logger } from '@pandacss/logger'
 import { ParserResult, Project } from '@pandacss/parser'
 import { uniq } from '@pandacss/shared'
 import type { LoadConfigResult, Runtime, WatchOptions, WatcherEventType } from '@pandacss/types'
+import { readFileSync } from 'node:fs'
+import { dirname, isAbsolute, join } from 'node:path'
 import { debounce } from 'perfect-debounce'
 import { createBox } from './cli-box'
 import { DiffEngine } from './diff-engine'
@@ -42,7 +45,42 @@ export class PandaContext extends Generator {
 
     this.output = new OutputEngine(this)
     this.diff = new DiffEngine(this)
+
+    if (config.designSystem) {
+      this.hydrateDesignSystemEncoder(config.designSystem)
+    }
+
     this.explicitDeps = this.getExplicitDependencies()
+  }
+
+  private hydrateDesignSystemEncoder(packageName: string) {
+    const cwd = this.config.cwd as string
+    const { manifest, manifestPath } = readLibManifest(packageName, cwd)
+
+    const buildinfoPath = isAbsolute(manifest.buildinfo)
+      ? manifest.buildinfo
+      : join(dirname(manifestPath), manifest.buildinfo)
+
+    let buildinfoRaw: string
+    try {
+      buildinfoRaw = readFileSync(buildinfoPath, 'utf-8')
+    } catch (error) {
+      logger.warn(
+        'designSystem',
+        `Could not read buildinfo at '${buildinfoPath}' for '${packageName}'. The library's buildinfo will not be hydrated.`,
+      )
+      return
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(buildinfoRaw)
+    } catch (error) {
+      logger.warn('designSystem', `Buildinfo at '${buildinfoPath}' is not valid JSON. Skipping hydration.`)
+      return
+    }
+
+    this.parserOptions.encoder.fromJSON(parsed as any)
   }
 
   private getExplicitDependencies = () => {
