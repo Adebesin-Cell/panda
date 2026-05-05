@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "@panda-test/broken-buildinfo",
+  "version": "1.0.0",
+  "panda": "^1.0.0",
+  "preset": "./preset.js",
+  "importMap": {},
+  "buildinfo": "./nonexistent.json"
+}
