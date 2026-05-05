@@ -455,6 +455,23 @@ export interface Config
     HooksOptions,
     PluginsOptions {
   /**
+   * Resolves a panda design-system library by package name. Reads the
+   * library's `panda.lib.json` manifest, pushes its preset onto the preset
+   * stack, concatenates its `importMap` entry into the consumer's, and
+   * hydrates the encoder from its buildinfo. One call replaces the manual
+   * `presets` + `importMap` + `include`-with-buildinfo coordination today's
+   * library consumers maintain.
+   *
+   * @example
+   * ```ts
+   * export default defineConfig({
+   *   designSystem: '@acme/ds',
+   *   include: ['./src/**\/*.{ts,tsx}'],
+   * })
+   * ```
+   */
+  designSystem?: string
+  /**
    * Whether to opt-out of the defaults config presets: [`@pandacss/preset-base`, `@pandacss/preset-panda`]
    * @default 'false'
    */
