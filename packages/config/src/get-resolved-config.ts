@@ -1,6 +1,8 @@
 import { omit, pick, traverse } from '@pandacss/shared'
 import type { Config, PandaHooks, Preset } from '@pandacss/types'
+import { dirname, isAbsolute, join } from 'node:path'
 import { bundle } from './bundle-config'
+import { readLibManifest } from './lib-manifest'
 import { mergeConfigs } from './merge-config'
 
 type Extendable<T> = T & { extend?: T }
@@ -16,6 +18,30 @@ const hookUtils = {
  * Recursively merge all presets into a single config (depth-first using stack)
  */
 export async function getResolvedConfig(config: ExtendableConfig, cwd: string, hooks?: Partial<PandaHooks>) {
+  if (config.designSystem) {
+    const { manifest, manifestPath } = readLibManifest(config.designSystem, cwd)
+
+    // Resolve the manifest's preset path against the manifest's directory
+    const presetPath = isAbsolute(manifest.preset) ? manifest.preset : join(dirname(manifestPath), manifest.preset)
+
+    // Bundle and load the preset module
+    const presetModule = await bundle(presetPath, cwd)
+    const designSystemPreset = presetModule.config
+
+    // Prepend to the consumer's presets so it's in the stack
+    config.presets = [designSystemPreset, ...(config.presets ?? [])]
+
+    // Concat the manifest's importMap entry into the consumer's importMap.
+    const consumerImportMap = config.importMap
+    if (consumerImportMap === undefined) {
+      config.importMap = manifest.importMap
+    } else if (Array.isArray(consumerImportMap)) {
+      config.importMap = [...consumerImportMap, manifest.importMap]
+    } else {
+      config.importMap = [consumerImportMap, manifest.importMap]
+    }
+  }
+
   const stack: ExtendableConfig[] = [config]
   const configs: ExtendableConfig[] = []
 
