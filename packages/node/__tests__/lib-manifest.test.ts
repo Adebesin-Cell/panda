@@ -12,8 +12,8 @@ beforeAll(() => {
     const dest = join(nodeModules, pkg)
     try {
       symlinkSync(join(fixtureCwd, target), dest)
-    } catch {
-      // already exists — fine
+    } catch (e: any) {
+      if (e.code !== 'EEXIST') throw e
     }
   }
   link('valid-lib', 'valid-pkg')
