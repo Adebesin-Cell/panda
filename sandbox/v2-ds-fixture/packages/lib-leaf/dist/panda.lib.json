@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "@v2-ds-fixture/lib-leaf",
+  "version": "0.0.0",
+  "panda": "^1.0.0",
+  "preset": "../preset.ts",
+  "importMap": {
+    "css": "@v2-ds-fixture/styled-system/css",
+    "recipes": "@v2-ds-fixture/styled-system/recipes"
+  },
+  "buildinfo": "./panda.buildinfo.json"
+}
