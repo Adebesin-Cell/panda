@@ -3,7 +3,6 @@ import { colors, logger } from '@pandacss/logger'
 import {
   PandaContext,
   analyze,
-  buildInfo,
   buildLib,
   codegen,
   cssgen,
@@ -35,7 +34,6 @@ import type {
   MainCommandFlags,
   McpCommandFlags,
   McpInitCommandFlags,
-  ShipCommandFlags,
   SpecCommandFlags,
   StudioCommandFlags,
 } from './types'
@@ -477,69 +475,6 @@ export async function main() {
 
       stopProfiling()
       stream.end()
-    })
-
-  cli
-    .command('ship [glob]', 'Ship extract result from files in glob')
-    .option('--silent', "Don't print any logs")
-    .option(
-      '--o, --outfile [file]',
-      "Output path for the build info file, default to './styled-system/panda.buildinfo.json'",
-    )
-    .option('-m, --minify', 'Minify generated JSON file')
-    .option('-c, --config <path>', 'Path to panda config file')
-    .option('--cwd <cwd>', 'Current working directory', { default: cwd })
-    .option('-w, --watch', 'Watch files and rebuild')
-    .option('-p, --poll', 'Use polling instead of filesystem events when watching')
-    .action(async (maybeGlob?: string, flags: ShipCommandFlags = {}) => {
-      const { silent, outfile: outfileFlag, minify, config: configPath, watch, poll } = flags
-
-      const cwd = resolve(flags.cwd!)
-
-      if (silent) {
-        logger.level = 'silent'
-      }
-
-      let ctx = await loadConfigAndCreateContext({
-        cwd,
-        config: maybeGlob ? { include: [maybeGlob] } : undefined,
-        configPath,
-      })
-
-      const outfile = outfileFlag ?? join(...ctx.paths.root, 'panda.buildinfo.json')
-
-      if (minify) {
-        ctx.config.minify = true
-      }
-
-      await buildInfo(ctx, outfile)
-
-      if (watch) {
-        ctx.watchConfig(
-          async () => {
-            const affecteds = await ctx.diff.reloadConfigAndRefreshContext((conf) => {
-              ctx = new PandaContext(conf)
-            })
-
-            await ctx.hooks['config:change']?.({ config: ctx.config, changes: affecteds })
-            await buildInfo(ctx, outfile)
-            logger.info('ctx:updated', 'config rebuilt ✅')
-          },
-          { cwd, poll },
-        )
-
-        ctx.watchFiles(async (event, file) => {
-          if (event === 'unlink') {
-            ctx.project.removeSourceFile(ctx.runtime.path.abs(cwd, file))
-          } else if (event === 'change') {
-            ctx.project.reloadSourceFile(file)
-            await buildInfo(ctx, outfile)
-          } else if (event === 'add') {
-            ctx.project.createSourceFile(file)
-            await buildInfo(ctx, outfile)
-          }
-        })
-      }
     })
 
   cli

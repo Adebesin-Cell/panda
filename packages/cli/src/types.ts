@@ -57,16 +57,6 @@ export interface DebugCommandFlags {
   logfile?: string
 }
 
-export interface ShipCommandFlags {
-  silent?: boolean
-  minify?: boolean
-  outfile?: string
-  cwd?: string
-  config?: string
-  watch?: boolean
-  poll?: boolean
-}
-
 export interface CodegenCommandFlags extends Pick<Config, 'cwd' | 'poll' | 'watch'> {
   clean?: boolean
   silent?: boolean
