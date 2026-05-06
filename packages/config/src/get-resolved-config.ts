@@ -21,22 +21,15 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
   if (config.designSystem) {
     const { manifest, manifestPath } = readLibManifest(config.designSystem, cwd)
 
-    // Resolve the manifest's preset path against the manifest's directory
     const presetPath = isAbsolute(manifest.preset) ? manifest.preset : join(dirname(manifestPath), manifest.preset)
-
-    // Bundle and load the preset module
     const presetModule = await bundle(presetPath, cwd)
     const exportName = manifest.presetExport ?? 'default'
 
-    // Pull the value out by export name. bundle()'s return shape may have
-    // the module under .config (some interopDefault paths) or directly on
-    // the result, so check both.
+    // bundle-n-require sometimes nests under .config; check both
     const moduleObj = (presetModule.config ?? presetModule) as Record<string, unknown>
     let designSystemPreset = moduleObj[exportName] as Preset | undefined
 
-    // Fallback for older manifests (pre-3c): if the requested export isn't
-    // present and the module looks like a Preset directly, use it. This
-    // keeps any hand-written fixtures from breaking during the migration.
+    // pre-3c manifests omit presetExport; the module itself may BE the preset
     if (!designSystemPreset && exportName === 'default') {
       designSystemPreset = moduleObj as unknown as Preset
     }
@@ -48,10 +41,8 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
       )
     }
 
-    // Prepend to the consumer's presets so it's in the stack
     config.presets = [designSystemPreset, ...(config.presets ?? [])]
 
-    // Concat the manifest's importMap entry into the consumer's importMap.
     const consumerImportMap = config.importMap
     if (consumerImportMap === undefined) {
       config.importMap = manifest.importMap
