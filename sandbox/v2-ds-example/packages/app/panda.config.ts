@@ -5,7 +5,8 @@ export default defineConfig({
   designSystem: '@v2-ds-example/lib',
   include: [
     './src/**/*.{ts,tsx}',
-    '@v2-ds-example/lib', // smart-include: package has panda.lib.json, will be skipped (designSystem handles it)
+    '@v2-ds-example/lib', // smart-include: has panda.lib.json — skipped from glob (designSystem handles it)
+    '@v2-ds-example/charts', // smart-include: NO manifest — auto-globbed via package.json files array
   ],
   exclude: [],
   outdir: '@v2-ds-example/styled-system',
