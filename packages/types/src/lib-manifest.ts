@@ -40,6 +40,15 @@ export interface LibManifest {
   preset: string
 
   /**
+   * Name of the preset's export in the file referenced by `preset`.
+   * Defaults to `'default'` when omitted (the file should default-export
+   * the preset). When the preset file uses named exports only, this field
+   * names the canonical export — `panda lib` writes it automatically by
+   * matching the preset's `name` against the file's exports.
+   */
+  presetExport?: string
+
+  /**
    * The `importMap` entry the library expects consumers to wire. Consumers
    * concatenate this into their effective importMap; the manifest reader
    * does not apply it directly.

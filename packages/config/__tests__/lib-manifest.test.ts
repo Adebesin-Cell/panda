@@ -24,6 +24,8 @@ beforeAll(() => {
   link('malformed', 'malformed-pkg')
   link('incomplete', 'incomplete-pkg')
   link('wrong-type', 'wrong-type-pkg')
+  link('with-preset-export', 'with-preset-export-pkg')
+  link('wrong-preset-export', 'wrong-preset-export-pkg')
 })
 
 afterAll(() => {
@@ -59,5 +61,19 @@ describe('readLibManifest', () => {
 
   test("throws when 'schemaVersion' is not an integer", () => {
     expect(() => readLibManifest('@panda-test/wrong-type', tmpRoot)).toThrow(/'schemaVersion' must be an integer/)
+  })
+
+  test('reads optional presetExport field when present', () => {
+    const result = readLibManifest('@panda-test/with-preset-export', tmpRoot)
+    expect(result.manifest.presetExport).toBe('examplePreset')
+  })
+
+  test('presetExport is undefined when omitted', () => {
+    const result = readLibManifest('@panda-test/valid-lib', tmpRoot)
+    expect(result.manifest.presetExport).toBeUndefined()
+  })
+
+  test("throws when 'presetExport' is not a string", () => {
+    expect(() => readLibManifest('@panda-test/wrong-preset-export', tmpRoot)).toThrow(/'presetExport' must be a string/)
   })
 })
