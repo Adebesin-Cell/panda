@@ -32,13 +32,13 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
     // the module under .config (some interopDefault paths) or directly on
     // the result, so check both.
     const moduleObj = (presetModule.config ?? presetModule) as Record<string, unknown>
-    let designSystemPreset = moduleObj[exportName] as ExtendableConfig | undefined
+    let designSystemPreset = moduleObj[exportName] as Preset | undefined
 
     // Fallback for older manifests (pre-3c): if the requested export isn't
     // present and the module looks like a Preset directly, use it. This
     // keeps any hand-written fixtures from breaking during the migration.
     if (!designSystemPreset && exportName === 'default') {
-      designSystemPreset = moduleObj as unknown as ExtendableConfig
+      designSystemPreset = moduleObj as unknown as Preset
     }
 
     if (!designSystemPreset) {
