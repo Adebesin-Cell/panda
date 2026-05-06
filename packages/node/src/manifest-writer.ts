@@ -3,44 +3,23 @@ import { dirname, join } from 'node:path'
 import type { LibManifest } from '@pandacss/types'
 
 export interface WriteLibManifestOptions {
-  /** The library package's root directory (cwd of the panda invocation). */
   cwd: string
-  /** Where to write panda.lib.json (relative to cwd). Default: 'dist'. */
   outdir: string
-  /** Path to the preset file, relative to the manifest. */
   preset: string
-  /** Path to panda.buildinfo.json, relative to the manifest. */
   buildinfo: string
-  /** Import map entry the manifest declares. */
   importMap: LibManifest['importMap']
-  /** Optional fallback re-extract globs. */
   files?: string[]
-  /** Override the manifest schema version. Default: 1. */
   schemaVersion?: number
-  /**
-   * Pre-resolved @pandacss/dev version (e.g. '2.5.0') to use when
-   * normalizing the panda peer range. When provided, skips the
-   * filesystem walk for installed version lookup. Useful for callers
-   * that memoize the lookup (e.g. `panda lib --watch`).
-   */
+  /** Pre-resolved @pandacss/dev version. Skips the node_modules walk. */
   pandaVersion?: string
-  /**
-   * Pre-parsed package.json. When provided, skips the disk read.
-   * Useful for callers that already have the package.json parsed
-   * (e.g. the `buildLib` orchestrator).
-   */
+  /** Pre-parsed package.json. Skips disk read. */
   pkg?: {
     name?: string
     version?: string
     devDependencies?: Record<string, string>
     peerDependencies?: Record<string, string>
   }
-  /**
-   * Name of the preset's export in the preset file. When the preset file
-   * has only named exports, the manifest needs to disambiguate which one
-   * is the canonical preset. `panda lib` derives this at build time from
-   * the resolved config's preset name.
-   */
+  /** Name of the preset's export. Defaults to 'default' downstream when omitted. */
   presetExport?: string
 }
 
@@ -51,15 +30,6 @@ export interface WriteLibManifestResult {
 
 const DEFAULT_SCHEMA_VERSION = 1
 
-/**
- * Writes a `panda.lib.json` manifest into `<cwd>/<outdir>/panda.lib.json`.
- *
- * Reads the lib's `package.json` to derive `name`, `version`, and the
- * panda peer range from `devDependencies['@pandacss/dev']`. The peer range
- * is normalized: `workspace:*` becomes `^<major>.0.0` based on the
- * installed @pandacss/dev version (looked up from node_modules); explicit
- * semver ranges pass through.
- */
 export function writeLibManifest(options: WriteLibManifestOptions): WriteLibManifestResult {
   const { cwd, outdir, preset, buildinfo, importMap, files, schemaVersion } = options
 
@@ -107,7 +77,6 @@ export function writeLibManifest(options: WriteLibManifestOptions): WriteLibMani
 }
 
 function normalizePandaRange(declared: string, cwd: string, providedVersion?: string): string {
-  // workspace:* and similar pnpm/yarn-protocols → derive from installed version
   if (!declared || declared.startsWith('workspace:') || declared.includes('catalog:')) {
     const installedVersion = providedVersion ?? lookupInstalledPandaVersion(cwd)
     if (installedVersion) {
@@ -116,14 +85,12 @@ function normalizePandaRange(declared: string, cwd: string, providedVersion?: st
         return `^${major}.0.0`
       }
     }
-    // Fall back: just say any version, with a clear marker.
     return '*'
   }
   return declared
 }
 
 function lookupInstalledPandaVersion(cwd: string): string | undefined {
-  // Walk up from cwd looking for node_modules/@pandacss/dev/package.json
   let dir = cwd
   while (true) {
     try {

@@ -1,58 +1,15 @@
-/**
- * Schema for `panda.lib.json` — the manifest a panda-based design system
- * library publishes. Lives in the library's `dist/` and is exposed via
- * the package's `exports` map under `./panda.lib.json`.
- *
- * All paths inside the manifest are relative to the manifest file itself.
- */
+/** Schema for `panda.lib.json`. All paths inside are relative to the manifest file. */
 export interface LibManifest {
-  /**
-   * Integer schema version of the `panda.lib.json` manifest itself.
-   *
-   * Note: this is distinct from the `schemaVersion` field inside
-   * `panda.buildinfo.json`, which is currently the `@pandacss/dev`
-   * package version (string). The two fields live on different files
-   * and serve different purposes.
-   *
-   * Bump when the manifest's shape changes in a way consumers must
-   * understand.
-   */
+  /** Integer schema version of the manifest itself (distinct from buildinfo's schemaVersion). */
   schemaVersion: number
-
-  /** The library's npm name, e.g. `@acme/ds`. */
   name: string
-
-  /** The library's npm version, e.g. `1.2.3`. */
   version: string
-
-  /**
-   * Semver range of `@pandacss/dev` the library was built against. The
-   * consumer's panda will compare its own version to this range and warn
-   * or fall back when ranges don't overlap.
-   */
+  /** Semver range of `@pandacss/dev` the lib was built against. */
   panda: string
-
-  /**
-   * Path to the serialized preset module, relative to the manifest. The
-   * preset carries tokens, semantic tokens, recipes, conditions, patterns,
-   * and keyframes. One preset per design system.
-   */
+  /** Path to the preset module, relative to the manifest. */
   preset: string
-
-  /**
-   * Name of the preset's export in the file referenced by `preset`.
-   * Defaults to `'default'` when omitted (the file should default-export
-   * the preset). When the preset file uses named exports only, this field
-   * names the canonical export — `panda lib` writes it automatically by
-   * matching the preset's `name` against the file's exports.
-   */
+  /** Name of the preset's export in `preset`. Defaults to `'default'` when omitted. */
   presetExport?: string
-
-  /**
-   * The `importMap` entry the library expects consumers to wire. Consumers
-   * concatenate this into their effective importMap; the manifest reader
-   * does not apply it directly.
-   */
   importMap: {
     css?: string
     recipes?: string
@@ -60,19 +17,8 @@ export interface LibManifest {
     jsx?: string
     tokens?: string
   }
-
-  /**
-   * Path to `panda.buildinfo.json`, relative to the manifest. Consumers
-   * hydrate their encoder from this file to skip re-extracting the library's
-   * source.
-   */
+  /** Path to `panda.buildinfo.json`, relative to the manifest. */
   buildinfo: string
-
-  /**
-   * Optional fallback re-extract globs. When the consumer's panda can't
-   * hydrate the buildinfo (schema mismatch, missing file), it falls back
-   * to extracting these paths from the published package. Globs are
-   * relative to the package root.
-   */
+  /** Optional fallback re-extract globs (relative to package root) when buildinfo can't hydrate. */
   files?: string[]
 }

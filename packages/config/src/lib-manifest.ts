@@ -9,25 +9,9 @@ export interface ReadLibManifestResult {
   manifestPath: string
 }
 
-/**
- * Module-scope memoization. `readLibManifest` is called from both
- * `getResolvedConfig` and `createContext` for the same package per
- * panda invocation. Cache by `cwd::packageName` to read each manifest
- * once.
- */
+// memoize: getResolvedConfig and createContext both call this for the same package per invocation
 const cache = new Map<string, ReadLibManifestResult>()
 
-/**
- * Resolves `<packageName>/panda.lib.json` via Node module resolution
- * starting from `cwd`, reads the manifest, validates it, and returns the
- * parsed manifest plus the absolute path to the file.
- *
- * Throws if:
- * - The package can't be resolved from `cwd`
- * - The package doesn't expose `./panda.lib.json` in its `exports`
- * - The file isn't valid JSON
- * - The JSON doesn't conform to the LibManifest shape
- */
 export function readLibManifest(packageName: string, cwd: string): ReadLibManifestResult {
   const cacheKey = `${cwd}::${packageName}`
   const cached = cache.get(cacheKey)
