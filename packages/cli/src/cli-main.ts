@@ -4,6 +4,7 @@ import {
   PandaContext,
   analyze,
   buildInfo,
+  buildLib,
   codegen,
   cssgen,
   debug,
@@ -538,6 +539,30 @@ export async function main() {
           }
         })
       }
+    })
+
+  cli
+    .command('lib', 'Build a panda design-system library — buildinfo + manifest + package exports')
+    .option('--outdir <dir>', 'Output directory for dist artifacts', { default: 'dist' })
+    .option('--preset <path>', 'Path to preset file relative to manifest', { default: '../preset.ts' })
+    .option('--silent', "Don't print any logs")
+    .option('-c, --config <path>', 'Path to panda config file')
+    .option('--cwd <cwd>', 'Current working directory', { default: cwd })
+    .action(async (flags: any = {}) => {
+      const { silent, outdir, preset, config: configPath } = flags
+
+      if (silent) {
+        logger.level = 'silent'
+      }
+
+      const cwd = resolve(flags.cwd!)
+
+      const ctx = await loadConfigAndCreateContext({
+        cwd,
+        configPath,
+      })
+
+      await buildLib(ctx, { outdir, preset })
     })
 
   cli
