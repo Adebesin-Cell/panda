@@ -124,7 +124,7 @@ export class PandaContext extends Generator {
 
     const globFiles = this.runtime.fs.glob({ include: pathGlobs, exclude, cwd })
 
-    const specFiles = bareSpecifiers.flatMap((spec) => this.resolveBareSpecifier(spec, cwd as string))
+    const specFiles = bareSpecifiers.flatMap((spec) => this.resolveBareSpecifier(spec, cwd ?? this.runtime.cwd()))
 
     return [...globFiles, ...specFiles]
   }
@@ -157,7 +157,7 @@ export class PandaContext extends Generator {
       pkgJsonPath = require.resolve(`${spec}/package.json`)
     } catch (error) {
       logger.warn(
-        'smart-include',
+        'smartInclude',
         `Cannot resolve bare specifier '${spec}' — neither a panda.lib.json nor a package.json found. Skipping.`,
       )
       return []
@@ -169,7 +169,13 @@ export class PandaContext extends Generator {
     // Use the package's `files` array if present, otherwise fall back to dist/**.
     const fileGlobs: string[] =
       Array.isArray(pkg.files) && pkg.files.length > 0
-        ? pkg.files.map((f: string) => `${f}/**/*.{js,mjs,cjs,ts,tsx}`)
+        ? pkg.files.map((f: string) => {
+            // Heuristic: if the last segment has a file extension, treat as a literal file path.
+            // Otherwise treat as a directory and glob its js/ts contents.
+            const lastSegment = f.split('/').pop() ?? ''
+            const isFilePath = lastSegment.includes('.')
+            return isFilePath ? f : `${f}/**/*.{js,mjs,cjs,ts,tsx}`
+          })
         : ['dist/**/*.{js,mjs,cjs}']
 
     return this.runtime.fs.glob({ include: fileGlobs, cwd: pkgRoot })
