@@ -46,7 +46,7 @@ export class PandaContext extends Generator {
     this.output = new OutputEngine(this)
     this.diff = new DiffEngine(this)
 
-    if (config.designSystem) {
+    if (config.designSystem && !config.libraryMode) {
       this.hydrateDesignSystemEncoder(config.designSystem)
     }
 
