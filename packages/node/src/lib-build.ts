@@ -40,6 +40,10 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   const buildinfoOutfile = join(cwd, outdir, 'panda.buildinfo.json')
   await buildInfo(ctx, buildinfoOutfile)
 
+  // Read package.json once. Pass it to both consumers.
+  const pkgPath = join(cwd, 'package.json')
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+
   // Step 2: write manifest
   const importMap = normalizeImportMap(ctx.config.importMap)
   const { manifestPath } = writeLibManifest({
@@ -49,11 +53,12 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
     buildinfo: './panda.buildinfo.json',
     importMap,
     pandaVersion: options.pandaVersion,
+    pkg,
   })
   logger.info('lib', `wrote ${manifestPath}`)
 
   // Step 3: patch package.json exports
-  patchPackageExports(cwd, outdir)
+  patchPackageExports(pkgPath, pkg, outdir)
 }
 
 function normalizeImportMap(importMap: unknown): Record<string, string> {
@@ -86,10 +91,7 @@ function normalizeImportMap(importMap: unknown): Record<string, string> {
   return {}
 }
 
-function patchPackageExports(cwd: string, outdir: string): void {
-  const pkgPath = join(cwd, 'package.json')
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
-
+function patchPackageExports(pkgPath: string, pkg: any, outdir: string): void {
   const exports = pkg.exports ?? {}
 
   const wanted: Record<string, string> = {
