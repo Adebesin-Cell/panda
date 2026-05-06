@@ -6,6 +6,7 @@ import { ParserResult, Project } from '@pandacss/parser'
 import { uniq } from '@pandacss/shared'
 import type { EncoderJson, LoadConfigResult, Runtime, WatchOptions, WatcherEventType } from '@pandacss/types'
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join } from 'node:path'
 import { debounce } from 'perfect-debounce'
 import { createBox } from './cli-box'
@@ -109,7 +110,69 @@ export class PandaContext extends Generator {
 
   getFiles = () => {
     const { include, exclude, cwd } = this.config
-    return this.runtime.fs.glob({ include, exclude, cwd })
+
+    // Partition include: bare specifiers vs path globs.
+    const bareSpecifiers: string[] = []
+    const pathGlobs: string[] = []
+    for (const entry of include ?? []) {
+      if (this.isBareSpecifier(entry)) {
+        bareSpecifiers.push(entry)
+      } else {
+        pathGlobs.push(entry)
+      }
+    }
+
+    const globFiles = this.runtime.fs.glob({ include: pathGlobs, exclude, cwd })
+
+    const specFiles = bareSpecifiers.flatMap((spec) => this.resolveBareSpecifier(spec, cwd as string))
+
+    return [...globFiles, ...specFiles]
+  }
+
+  private isBareSpecifier(entry: string): boolean {
+    // Path-like: starts with ./ or ../ or / (or drive letter on Windows)
+    if (entry.startsWith('./') || entry.startsWith('../') || entry.startsWith('/')) return false
+    if (/^[a-zA-Z]:/.test(entry)) return false
+    // Glob characters indicate a path glob, not a package name
+    if (entry.includes('*') || entry.includes('?') || entry.includes('{') || entry.includes('[')) return false
+    return true
+  }
+
+  private resolveBareSpecifier(spec: string, cwd: string): string[] {
+    const require = createRequire(`${cwd}/noop.js`)
+
+    // Try the manifest first — if present, the package is a design system.
+    // Smart include skips it from the glob; the consumer uses `designSystem`
+    // to consume it, not `include`.
+    try {
+      require.resolve(`${spec}/panda.lib.json`)
+      return []
+    } catch {
+      // not a panda lib — fall through
+    }
+
+    // Resolve the package itself; glob its published files.
+    let pkgJsonPath: string
+    try {
+      pkgJsonPath = require.resolve(`${spec}/package.json`)
+    } catch (error) {
+      logger.warn(
+        'smart-include',
+        `Cannot resolve bare specifier '${spec}' — neither a panda.lib.json nor a package.json found. Skipping.`,
+      )
+      return []
+    }
+
+    const pkgRoot = dirname(pkgJsonPath)
+    const pkg = JSON.parse(this.runtime.fs.readFileSync(pkgJsonPath))
+
+    // Use the package's `files` array if present, otherwise fall back to dist/**.
+    const fileGlobs: string[] =
+      Array.isArray(pkg.files) && pkg.files.length > 0
+        ? pkg.files.map((f: string) => `${f}/**/*.{js,mjs,cjs,ts,tsx}`)
+        : ['dist/**/*.{js,mjs,cjs}']
+
+    return this.runtime.fs.glob({ include: fileGlobs, cwd: pkgRoot })
   }
 
   parseFile = (filePath: string, styleEncoder?: StyleEncoder) => {
