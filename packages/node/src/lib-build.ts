@@ -47,7 +47,7 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
 
   // Detect which export of the preset file is the lib's own preset
   const libPresetName = findLibPresetName(ctx.config.presets as any[])
-  const presetExport = await detectPresetExport(cwd, preset, libPresetName)
+  const presetExport = await detectPresetExport(cwd, outdir, preset, libPresetName)
 
   // Step 2: write manifest
   const importMap = normalizeImportMap(ctx.config.importMap)
@@ -102,22 +102,37 @@ function findLibPresetName(presets: unknown[] | undefined): string | undefined {
  */
 async function detectPresetExport(
   cwd: string,
-  presetPathRelativeToCwd: string,
+  outdir: string,
+  presetPathRelativeToManifest: string,
   libPresetName: string | undefined,
 ): Promise<string | undefined> {
   if (!libPresetName) return undefined
 
-  const absPath = isAbsolute(presetPathRelativeToCwd) ? presetPathRelativeToCwd : join(cwd, presetPathRelativeToCwd)
+  // The preset path is relative to the manifest, which lives at <cwd>/<outdir>/panda.lib.json.
+  // Resolve from the manifest directory first so that the default '../preset.ts' correctly
+  // points to <cwd>/preset.ts rather than one level above cwd. If bundle fails from the
+  // manifest-relative path, fall back to cwd-relative resolution for backwards compatibility.
+  const manifestRelPath = isAbsolute(presetPathRelativeToManifest)
+    ? presetPathRelativeToManifest
+    : join(cwd, outdir, presetPathRelativeToManifest)
+  const cwdRelPath = isAbsolute(presetPathRelativeToManifest)
+    ? presetPathRelativeToManifest
+    : join(cwd, presetPathRelativeToManifest)
 
   let bundled: { config: any; dependencies: string[] }
   try {
-    bundled = await bundle(absPath, cwd)
-  } catch (e) {
-    logger.warn(
-      'lib',
-      `could not bundle preset at '${absPath}' to detect export name — manifest will omit presetExport: ${String(e)}`,
-    )
-    return undefined
+    bundled = await bundle(manifestRelPath, cwd)
+  } catch {
+    // Fall back to cwd-relative if manifest-relative resolution fails
+    try {
+      bundled = await bundle(cwdRelPath, cwd)
+    } catch (e) {
+      logger.warn(
+        'lib',
+        `could not bundle preset at '${cwdRelPath}' to detect export name — manifest will omit presetExport: ${String(e)}`,
+      )
+      return undefined
+    }
   }
 
   // `bundle` returns `{ config: mod?.default ?? mod }`.
