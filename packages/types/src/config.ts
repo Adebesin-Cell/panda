@@ -430,33 +430,9 @@ interface PresetOptions {
    * Used to create reusable config presets for your project or team.
    */
   presets?: (string | Preset | Promise<Preset>)[]
-  /**
-   * Resolves a panda design-system library by package name. Reads the
-   * library's `panda.lib.json` manifest, pushes its preset onto the preset
-   * stack, concatenates its `importMap` entry into the consumer's, and
-   * hydrates the encoder from its buildinfo. One call replaces the manual
-   * `presets` + `importMap` + `include`-with-buildinfo coordination today's
-   * library consumers maintain.
-   *
-   * @example
-   * ```ts
-   * export default defineConfig({
-   *   designSystem: '@acme/ds',
-   *   include: ['./src/**\/*.{ts,tsx}'],
-   * })
-   * ```
-   */
+  /** Resolves a panda design-system library by package name (reads its `panda.lib.json`). */
   designSystem?: string
-  /**
-   * Internal: when true, the context skips hydrating the encoder from the
-   * upstream `designSystem` manifest. Set by the `panda lib` command so a
-   * library's own ship doesn't transitively re-emit upstream styles.
-   *
-   * Not intended for direct user configuration. Setting this manually can
-   * produce inconsistent extraction; let `panda lib` manage it.
-   *
-   * @internal
-   */
+  /** @internal Skips upstream `designSystem` hydration; set by `panda lib`. */
   libraryMode?: boolean
 }
 

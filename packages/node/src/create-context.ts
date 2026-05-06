@@ -111,7 +111,6 @@ export class PandaContext extends Generator {
   getFiles = () => {
     const { include, exclude, cwd } = this.config
 
-    // Partition include: bare specifiers vs path globs.
     const bareSpecifiers: string[] = []
     const pathGlobs: string[] = []
     for (const entry of include ?? []) {
@@ -123,17 +122,14 @@ export class PandaContext extends Generator {
     }
 
     const globFiles = this.runtime.fs.glob({ include: pathGlobs, exclude, cwd })
-
     const specFiles = bareSpecifiers.flatMap((spec) => this.resolveBareSpecifier(spec, cwd ?? this.runtime.cwd()))
 
     return [...globFiles, ...specFiles]
   }
 
   private isBareSpecifier(entry: string): boolean {
-    // Path-like: starts with ./ or ../ or / (or drive letter on Windows)
     if (entry.startsWith('./') || entry.startsWith('../') || entry.startsWith('/')) return false
     if (/^[a-zA-Z]:/.test(entry)) return false
-    // Glob characters indicate a path glob, not a package name
     if (entry.includes('*') || entry.includes('?') || entry.includes('{') || entry.includes('[')) return false
     return true
   }
@@ -141,24 +137,19 @@ export class PandaContext extends Generator {
   private resolveBareSpecifier(spec: string, cwd: string): string[] {
     const require = createRequire(`${cwd}/noop.js`)
 
-    // Try the manifest first — if present, the package is a design system.
-    // Smart include skips it from the glob; the consumer uses `designSystem`
-    // to consume it, not `include`.
+    // package with panda.lib.json is consumed via `designSystem`, not include — skip from glob
     try {
       require.resolve(`${spec}/panda.lib.json`)
       return []
     } catch {
-      // not a panda lib — fall through
+      // not a panda lib
     }
 
-    // Resolve the package itself; glob its published files.
     let pkgJsonPath: string
     try {
       pkgJsonPath = require.resolve(`${spec}/package.json`)
     } catch {
-      // Fallback: many packages have an `exports` field that doesn't expose
-      // ./package.json. Resolve the package's main entry instead and walk up
-      // to find the owning package.json.
+      // many packages have `exports` that doesn't expose ./package.json — walk up from main entry
       try {
         const mainEntry = require.resolve(spec)
         let dir = dirname(mainEntry)
@@ -189,12 +180,10 @@ export class PandaContext extends Generator {
     const pkgRoot = dirname(pkgJsonPath)
     const pkg = JSON.parse(this.runtime.fs.readFileSync(pkgJsonPath))
 
-    // Use the package's `files` array if present, otherwise fall back to dist/**.
     const fileGlobs: string[] =
       Array.isArray(pkg.files) && pkg.files.length > 0
         ? pkg.files.map((f: string) => {
-            // Heuristic: if the last segment has a file extension, treat as a literal file path.
-            // Otherwise treat as a directory and glob its js/ts contents.
+            // file-path entries (e.g. "dist/index.js") have an extension; directory entries don't
             const lastSegment = f.split('/').pop() ?? ''
             const isFilePath = lastSegment.includes('.')
             return isFilePath ? f : `${f}/**/*.{js,mjs,cjs,ts,tsx}`
