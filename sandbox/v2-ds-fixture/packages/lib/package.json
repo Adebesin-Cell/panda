@@ -1,0 +1,27 @@
+{
+  "name": "@v2-ds-fixture/lib",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "src",
+    "dist",
+    "preset.ts"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./preset": "./preset.ts",
+    "./panda.buildinfo.json": "./dist/panda.buildinfo.json",
+    "./panda.lib.json": "./dist/panda.lib.json"
+  },
+  "scripts": {
+    "css:gen": "panda codegen",
+    "lib": "panda lib"
+  },
+  "dependencies": {
+    "@v2-ds-fixture/styled-system": "workspace:*"
+  },
+  "devDependencies": {
+    "@pandacss/dev": "workspace:*"
+  }
+}
