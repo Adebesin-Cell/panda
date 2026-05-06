@@ -99,6 +99,9 @@ function validate(value: unknown, path: string): LibManifest {
   if (typeof v.preset !== 'string') {
     throw new Error(`Manifest at '${path}': 'preset' must be a string.`)
   }
+  if (v.presetExport !== undefined && typeof v.presetExport !== 'string') {
+    throw new Error(`Manifest at '${path}': 'presetExport' must be a string if present.`)
+  }
   if (typeof v.buildinfo !== 'string') {
     throw new Error(`Manifest at '${path}': 'buildinfo' must be a string.`)
   }

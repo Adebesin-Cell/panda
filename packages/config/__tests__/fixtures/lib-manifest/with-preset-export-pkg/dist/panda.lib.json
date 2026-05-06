@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "@panda-test/with-preset-export",
+  "version": "1.0.0",
+  "panda": "^1.0.0",
+  "preset": "./preset.js",
+  "presetExport": "examplePreset",
+  "importMap": {},
+  "buildinfo": "./panda.buildinfo.json"
+}
