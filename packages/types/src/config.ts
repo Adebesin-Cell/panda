@@ -447,6 +447,17 @@ interface PresetOptions {
    * ```
    */
   designSystem?: string
+  /**
+   * Internal: when true, the context skips hydrating the encoder from the
+   * upstream `designSystem` manifest. Set by the `panda lib` command so a
+   * library's own ship doesn't transitively re-emit upstream styles.
+   *
+   * Not intended for direct user configuration. Setting this manually can
+   * produce inconsistent extraction; let `panda lib` manage it.
+   *
+   * @internal
+   */
+  libraryMode?: boolean
 }
 
 export interface HooksOptions {
