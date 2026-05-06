@@ -104,4 +104,27 @@ describe('buildLib', () => {
     const manifest = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
     expect(manifest.presetExport).toBe('testPreset')
   })
+
+  test('writes presetExport=default when the preset file has a default export', async () => {
+    // Override the fixture's preset to use module.exports (default export style for CJS).
+    // Avoid external imports so the bundle step resolves cleanly inside the tmp dir.
+    const presetWithDefault = `
+module.exports = {
+  name: 'my-design-system',
+  theme: { extend: { tokens: { colors: { primary: { value: '#3b82f6' } } } } },
+}
+`
+    writeFileSync(join(tmpRoot, 'preset.js'), presetWithDefault)
+
+    // Create a context where the resolved config includes the lib's preset object
+    const ctx = makeCtx(tmpRoot, {
+      presets: [{ name: 'my-design-system', theme: { tokens: {} } }],
+    })
+
+    // Point preset option to the preset.js we just wrote (relative to cwd)
+    await buildLib(ctx, { outdir: 'dist', preset: './preset.js' })
+
+    const manifest = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
+    expect(manifest.presetExport).toBe('default')
+  })
 })

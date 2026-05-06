@@ -77,7 +77,15 @@ function findLibPresetName(presets: unknown[] | undefined): string | undefined {
   // Panda built-ins to filter out
   const builtinNames = new Set(['@pandacss/preset-base', '@pandacss/preset-panda'])
 
-  // Walk in reverse — the lib's preset is typically last in the user-declared array
+  // Walk in REVERSE — convention is that a lib's own preset is declared
+  // LAST in the user's panda.config.ts `presets:` array, after panda's
+  // defaults and any parent-lib presets. After getResolvedConfig flattens
+  // the chain (depth-first), the lib's own preset is also the last entry
+  // in the resolved stack. Reverse walk picks it cleanly.
+  //
+  // Edge case: if a lib has two non-builtin presets in its array (e.g.
+  // [myLib, externalLib]), reverse walk picks externalLib. That's an
+  // unusual setup; document if it becomes a real concern.
   for (let i = presets.length - 1; i >= 0; i--) {
     const p = presets[i] as any
     if (p && typeof p === 'object' && typeof p.name === 'string' && !builtinNames.has(p.name)) {
@@ -104,7 +112,11 @@ async function detectPresetExport(
   let bundled: { config: any; dependencies: string[] }
   try {
     bundled = await bundle(absPath, cwd)
-  } catch {
+  } catch (e) {
+    logger.warn(
+      'lib',
+      `could not bundle preset at '${absPath}' to detect export name — manifest will omit presetExport: ${String(e)}`,
+    )
     return undefined
   }
 
