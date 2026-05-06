@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.10.0",
+  "styles": {
+    "atomic": [
+      "background]___[value:brand",
+      "color]___[value:white",
+      "paddingInline]___[value:6",
+      "paddingBlock]___[value:4",
+      "animation]___[value:acmeFade 0.3s ease-in-out",
+      "color]___[value:surface",
+      "padding]___[value:6",
+      "borderRadius]___[value:12px",
+      "background]___[value:accent",
+      "color]___[value:brand",
+      "padding]___[value:10",
+      "fontSize]___[value:24px"
+    ],
+    "recipes": {
+      "button": [],
+      "card": [],
+      "panel": []
+    }
+  }
+}
