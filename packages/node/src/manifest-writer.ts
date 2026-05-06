@@ -24,6 +24,17 @@ export interface WriteLibManifestOptions {
    * that memoize the lookup (e.g. `panda lib --watch`).
    */
   pandaVersion?: string
+  /**
+   * Pre-parsed package.json. When provided, skips the disk read.
+   * Useful for callers that already have the package.json parsed
+   * (e.g. the `buildLib` orchestrator).
+   */
+  pkg?: {
+    name?: string
+    version?: string
+    devDependencies?: Record<string, string>
+    peerDependencies?: Record<string, string>
+  }
 }
 
 export interface WriteLibManifestResult {
@@ -47,10 +58,14 @@ export function writeLibManifest(options: WriteLibManifestOptions): WriteLibMani
 
   const pkgPath = join(cwd, 'package.json')
   let pkg: any
-  try {
-    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
-  } catch (error) {
-    throw new Error(`Cannot read package.json at '${pkgPath}'.`, { cause: error })
+  if (options.pkg) {
+    pkg = options.pkg
+  } else {
+    try {
+      pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+    } catch (error) {
+      throw new Error(`Cannot read package.json at '${pkgPath}'.`, { cause: error })
+    }
   }
 
   if (typeof pkg.name !== 'string') {
