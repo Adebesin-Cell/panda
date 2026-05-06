@@ -31,6 +31,7 @@ import type {
   DebugCommandFlags,
   EmitPackageCommandFlags,
   InitCommandFlags,
+  LibCommandFlags,
   MainCommandFlags,
   McpCommandFlags,
   McpInitCommandFlags,
@@ -548,7 +549,7 @@ export async function main() {
     .option('--silent', "Don't print any logs")
     .option('-c, --config <path>', 'Path to panda config file')
     .option('--cwd <cwd>', 'Current working directory', { default: cwd })
-    .action(async (flags: any = {}) => {
+    .action(async (flags: LibCommandFlags = {}) => {
       const { silent, outdir, preset, config: configPath } = flags
 
       if (silent) {
