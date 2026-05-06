@@ -12,7 +12,7 @@
   },
   "scripts": {
     "css:gen": "panda codegen",
-    "css:ship": "panda ship --outfile dist/panda.buildinfo.json"
+    "lib": "panda lib"
   },
   "dependencies": {
     "@v2-ds-example/styled-system": "workspace:*"

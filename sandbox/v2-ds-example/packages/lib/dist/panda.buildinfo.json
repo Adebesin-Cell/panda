@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.10.0",
+  "styles": {
+    "atomic": [
+      "background]___[value:surface",
+      "color]___[value:brand",
+      "padding]___[value:8",
+      "borderRadius]___[value:12px"
+    ],
+    "recipes": {
+      "button": [
+        "visual]___[value:solid]___[recipe:button",
+        "visual]___[value:outline]___[recipe:button"
+      ]
+    }
+  }
+}

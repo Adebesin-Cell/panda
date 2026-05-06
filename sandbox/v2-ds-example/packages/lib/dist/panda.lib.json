@@ -6,7 +6,10 @@
   "preset": "../preset.ts",
   "importMap": {
     "css": "@v2-ds-example/styled-system/css",
-    "recipes": "@v2-ds-example/styled-system/recipes"
+    "recipes": "@v2-ds-example/styled-system/recipes",
+    "patterns": "@v2-ds-example/styled-system/patterns",
+    "jsx": "@v2-ds-example/styled-system/jsx",
+    "tokens": "@v2-ds-example/styled-system/tokens"
   },
   "buildinfo": "./panda.buildinfo.json"
 }
