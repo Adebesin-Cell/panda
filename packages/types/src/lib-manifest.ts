@@ -7,8 +7,15 @@
  */
 export interface LibManifest {
   /**
-   * Integer schema version. Unrelated to the panda package version. Bump
-   * when the manifest's shape changes in a way consumers must understand.
+   * Integer schema version of the `panda.lib.json` manifest itself.
+   *
+   * Note: this is distinct from the `schemaVersion` field inside
+   * `panda.buildinfo.json`, which is currently the `@pandacss/dev`
+   * package version (string). The two fields live on different files
+   * and serve different purposes.
+   *
+   * Bump when the manifest's shape changes in a way consumers must
+   * understand.
    */
   schemaVersion: number
 
