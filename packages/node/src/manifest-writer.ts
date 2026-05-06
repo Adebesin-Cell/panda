@@ -35,6 +35,13 @@ export interface WriteLibManifestOptions {
     devDependencies?: Record<string, string>
     peerDependencies?: Record<string, string>
   }
+  /**
+   * Name of the preset's export in the preset file. When the preset file
+   * has only named exports, the manifest needs to disambiguate which one
+   * is the canonical preset. `panda lib` derives this at build time from
+   * the resolved config's preset name.
+   */
+  presetExport?: string
 }
 
 export interface WriteLibManifestResult {
@@ -84,6 +91,7 @@ export function writeLibManifest(options: WriteLibManifestOptions): WriteLibMani
     version: pkg.version,
     panda: pandaRange,
     preset,
+    ...(options.presetExport !== undefined ? { presetExport: options.presetExport } : {}),
     importMap,
     buildinfo,
     ...(files && files.length > 0 ? { files } : {}),
