@@ -10,6 +10,14 @@ export interface ReadLibManifestResult {
 }
 
 /**
+ * Module-scope memoization. `readLibManifest` is called from both
+ * `getResolvedConfig` and `createContext` for the same package per
+ * panda invocation. Cache by `cwd::packageName` to read each manifest
+ * once.
+ */
+const cache = new Map<string, ReadLibManifestResult>()
+
+/**
  * Resolves `<packageName>/panda.lib.json` via Node module resolution
  * starting from `cwd`, reads the manifest, validates it, and returns the
  * parsed manifest plus the absolute path to the file.
@@ -21,6 +29,10 @@ export interface ReadLibManifestResult {
  * - The JSON doesn't conform to the LibManifest shape
  */
 export function readLibManifest(packageName: string, cwd: string): ReadLibManifestResult {
+  const cacheKey = `${cwd}::${packageName}`
+  const cached = cache.get(cacheKey)
+  if (cached) return cached
+
   const require = createRequire(join(cwd, 'noop.js'))
 
   let manifestPath: string
@@ -45,7 +57,9 @@ export function readLibManifest(packageName: string, cwd: string): ReadLibManife
   }
 
   const manifest = validate(parsed, manifestPath)
-  return { manifest, manifestPath }
+  const result = { manifest, manifestPath }
+  cache.set(cacheKey, result)
+  return result
 }
 
 function validate(value: unknown, path: string): LibManifest {
