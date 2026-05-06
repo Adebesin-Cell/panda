@@ -131,6 +131,20 @@ panda resolves the manifest, wires up the preset, and adds the buildinfo path to
 }
 ```
 
+## smart include
+
+`include` accepts bare package specifiers. when the resolved package has a `panda.lib.json`, the bare specifier is skipped from glob (the manifest is the source of truth via `designSystem`). when the package doesn't have a manifest, panda globs its published files automatically.
+
+example:
+
+```ts
+include: [
+  './src/**/*.{ts,tsx}',
+  '@v2-ds-example/lib',  // skipped — has panda.lib.json
+  '@acme/charts',        // would be globbed — assumes published `dist/` files
+]
+```
+
 ## limitations
 
 - `panda lib` (phase 3) doesn't exist yet — the manifest is hand-written. in production you'd run `panda lib` as part of the lib's build step
