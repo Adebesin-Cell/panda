@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
+import { bundle } from '@pandacss/config'
 import { logger } from '@pandacss/logger'
 import { buildInfo } from './build-info'
 import type { PandaContext } from './create-context'
@@ -44,6 +45,10 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   const pkgPath = join(cwd, 'package.json')
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
 
+  // Detect which export of the preset file is the lib's own preset
+  const libPresetName = findLibPresetName(ctx.config.presets as any[])
+  const presetExport = await detectPresetExport(cwd, preset, libPresetName)
+
   // Step 2: write manifest
   const importMap = normalizeImportMap(ctx.config.importMap)
   const { manifestPath } = writeLibManifest({
@@ -54,11 +59,74 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
     importMap,
     pandaVersion: options.pandaVersion,
     pkg,
+    presetExport,
   })
   logger.info('lib', `wrote ${manifestPath}`)
 
   // Step 3: patch package.json exports
   patchPackageExports(pkgPath, pkg, outdir)
+}
+
+/**
+ * Finds the lib's own preset name from the resolved config's presets array,
+ * filtering out panda built-ins.
+ */
+function findLibPresetName(presets: unknown[] | undefined): string | undefined {
+  if (!Array.isArray(presets)) return undefined
+
+  // Panda built-ins to filter out
+  const builtinNames = new Set(['@pandacss/preset-base', '@pandacss/preset-panda'])
+
+  // Walk in reverse — the lib's preset is typically last in the user-declared array
+  for (let i = presets.length - 1; i >= 0; i--) {
+    const p = presets[i] as any
+    if (p && typeof p === 'object' && typeof p.name === 'string' && !builtinNames.has(p.name)) {
+      return p.name
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * Bundles the preset file and finds which export key matches the lib's preset
+ * by `name`. Returns the export name (e.g. `'testPreset'` or `'default'`).
+ */
+async function detectPresetExport(
+  cwd: string,
+  presetPathRelativeToCwd: string,
+  libPresetName: string | undefined,
+): Promise<string | undefined> {
+  if (!libPresetName) return undefined
+
+  const absPath = isAbsolute(presetPathRelativeToCwd) ? presetPathRelativeToCwd : join(cwd, presetPathRelativeToCwd)
+
+  let bundled: { config: any; dependencies: string[] }
+  try {
+    bundled = await bundle(absPath, cwd)
+  } catch {
+    return undefined
+  }
+
+  // `bundle` returns `{ config: mod?.default ?? mod }`.
+  // - If the file has a default export, `config` IS the preset value directly.
+  // - If the file has only named exports, `config` IS the whole module object
+  //   (e.g. `{ testPreset: <Preset> }`).
+  const candidate = bundled?.config
+  if (!candidate || typeof candidate !== 'object') return undefined
+
+  // If config itself has `name` matching libPresetName, the file uses a default export
+  if ((candidate as any).name === libPresetName) return 'default'
+
+  // Otherwise assume it's a namespace object — find the matching named export
+  for (const [key, value] of Object.entries(candidate)) {
+    if (key === 'default') continue
+    if (value && typeof value === 'object' && (value as any).name === libPresetName) {
+      return key
+    }
+  }
+
+  return undefined
 }
 
 function normalizeImportMap(importMap: unknown): Record<string, string> {

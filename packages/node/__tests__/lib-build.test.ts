@@ -11,13 +11,19 @@ const FIXTURE_SRC = `
 export const styles = { color: 'primary', padding: '4' }
 `
 
-function makeCtx(cwd: string): PandaContext {
+const FIXTURE_PRESET = `
+const testPreset = { name: 'my-design-system', theme: { tokens: {} } }
+exports.testPreset = testPreset
+`
+
+function makeCtx(cwd: string, extraConfig?: Record<string, unknown>): PandaContext {
   const conf: any = {
     config: {
       cwd,
       include: ['./src/**/*.{ts,tsx}'],
       outdir: 'styled-system',
       importMap: '@panda-test/orchestrator-lib/styled-system',
+      ...extraConfig,
     },
     tsconfig: {},
     hooks: {},
@@ -81,5 +87,21 @@ describe('buildLib', () => {
 
     expect(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8')).toBe(firstManifest)
     expect(readFileSync(join(tmpRoot, 'package.json'), 'utf-8')).toBe(firstPkg)
+  })
+
+  test('writes presetExport when the preset file uses named exports', async () => {
+    // Write a CommonJS preset file with a named export `testPreset`
+    writeFileSync(join(tmpRoot, 'preset.js'), FIXTURE_PRESET)
+
+    // Create a context where the resolved config includes the lib's preset object
+    const ctx = makeCtx(tmpRoot, {
+      presets: [{ name: 'my-design-system', theme: { tokens: {} } }],
+    })
+
+    // Point preset option to the preset.js we just wrote (relative to cwd)
+    await buildLib(ctx, { outdir: 'dist', preset: './preset.js' })
+
+    const manifest = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
+    expect(manifest.presetExport).toBe('testPreset')
   })
 })

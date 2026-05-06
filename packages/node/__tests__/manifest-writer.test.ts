@@ -124,4 +124,31 @@ describe('writeLibManifest', () => {
     const written = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
     expect(written.panda).toBe('^3.0.0')
   })
+
+  test('writes presetExport when provided', () => {
+    writeLibManifest({
+      cwd: tmpRoot,
+      outdir: 'dist',
+      preset: './preset.js',
+      buildinfo: './panda.buildinfo.json',
+      importMap: {},
+      presetExport: 'examplePreset',
+    })
+
+    const written = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
+    expect(written.presetExport).toBe('examplePreset')
+  })
+
+  test('omits presetExport when not provided', () => {
+    writeLibManifest({
+      cwd: tmpRoot,
+      outdir: 'dist',
+      preset: './preset.js',
+      buildinfo: './panda.buildinfo.json',
+      importMap: {},
+    })
+
+    const written = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
+    expect('presetExport' in written).toBe(false)
+  })
 })
