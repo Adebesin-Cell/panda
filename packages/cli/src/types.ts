@@ -75,6 +75,14 @@ export interface CodegenCommandFlags extends Pick<Config, 'cwd' | 'poll' | 'watc
   logfile?: string
 }
 
+export interface LibCommandFlags {
+  silent?: boolean
+  outdir?: string
+  preset?: string
+  config?: string
+  cwd?: string
+}
+
 export interface MainCommandFlags extends Pick<Config, 'cwd' | 'poll' | 'watch'> {
   outdir?: string
   minify?: boolean
