@@ -25,11 +25,9 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
     const presetModule = await bundle(presetPath, cwd)
     const exportName = manifest.presetExport ?? 'default'
 
-    // bundle-n-require sometimes nests under .config; check both
     const moduleObj = (presetModule.config ?? presetModule) as Record<string, unknown>
     let designSystemPreset = moduleObj[exportName] as Preset | undefined
 
-    // pre-3c manifests omit presetExport; the module itself may BE the preset
     if (!designSystemPreset && exportName === 'default') {
       designSystemPreset = moduleObj as unknown as Preset
     }

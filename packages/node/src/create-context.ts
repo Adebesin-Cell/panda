@@ -137,19 +137,15 @@ export class PandaContext extends Generator {
   private resolveBareSpecifier(spec: string, cwd: string): string[] {
     const require = createRequire(`${cwd}/noop.js`)
 
-    // package with panda.lib.json is consumed via `designSystem`, not include — skip from glob
     try {
       require.resolve(`${spec}/panda.lib.json`)
       return []
-    } catch {
-      // not a panda lib
-    }
+    } catch {}
 
     let pkgJsonPath: string
     try {
       pkgJsonPath = require.resolve(`${spec}/package.json`)
     } catch {
-      // many packages have `exports` that doesn't expose ./package.json — walk up from main entry
       try {
         const mainEntry = require.resolve(spec)
         let dir = dirname(mainEntry)
@@ -183,7 +179,6 @@ export class PandaContext extends Generator {
     const fileGlobs: string[] =
       Array.isArray(pkg.files) && pkg.files.length > 0
         ? pkg.files.map((f: string) => {
-            // file-path entries (e.g. "dist/index.js") have an extension; directory entries don't
             const lastSegment = f.split('/').pop() ?? ''
             const isFilePath = lastSegment.includes('.')
             return isFilePath ? f : `${f}/**/*.{js,mjs,cjs,ts,tsx}`

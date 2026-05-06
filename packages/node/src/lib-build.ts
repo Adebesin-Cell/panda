@@ -48,7 +48,6 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   patchPackageExports(pkgPath, pkg, outdir)
 }
 
-// reverse walk — lib's own preset is conventionally last after panda defaults and parent-lib chains
 function findLibPresetName(presets: unknown[] | undefined): string | undefined {
   if (!Array.isArray(presets)) return undefined
 
@@ -72,7 +71,6 @@ async function detectPresetExport(
 ): Promise<string | undefined> {
   if (!libPresetName) return undefined
 
-  // path is manifest-relative (manifest lives at cwd/outdir/); fall back to cwd-relative for older shapes
   const manifestRelPath = isAbsolute(presetPathRelativeToManifest)
     ? presetPathRelativeToManifest
     : join(cwd, outdir, presetPathRelativeToManifest)
@@ -95,7 +93,6 @@ async function detectPresetExport(
     }
   }
 
-  // bundle returns { config: mod?.default ?? mod } — config is either the preset (default export) or the whole namespace
   const candidate = bundled?.config
   if (!candidate || typeof candidate !== 'object') return undefined
 

@@ -9,7 +9,6 @@ export interface ReadLibManifestResult {
   manifestPath: string
 }
 
-// memoize: getResolvedConfig and createContext both call this for the same package per invocation
 const cache = new Map<string, ReadLibManifestResult>()
 
 export function readLibManifest(packageName: string, cwd: string): ReadLibManifestResult {
