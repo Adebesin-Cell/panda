@@ -17,6 +17,13 @@ export interface WriteLibManifestOptions {
   files?: string[]
   /** Override the manifest schema version. Default: 1. */
   schemaVersion?: number
+  /**
+   * Pre-resolved @pandacss/dev version (e.g. '2.5.0') to use when
+   * normalizing the panda peer range. When provided, skips the
+   * filesystem walk for installed version lookup. Useful for callers
+   * that memoize the lookup (e.g. `panda lib --watch`).
+   */
+  pandaVersion?: string
 }
 
 export interface WriteLibManifestResult {
@@ -54,7 +61,7 @@ export function writeLibManifest(options: WriteLibManifestOptions): WriteLibMani
   }
 
   const declaredPandaRange = pkg.devDependencies?.['@pandacss/dev'] ?? pkg.peerDependencies?.['@pandacss/dev'] ?? ''
-  const pandaRange = normalizePandaRange(declaredPandaRange, cwd)
+  const pandaRange = normalizePandaRange(declaredPandaRange, cwd, options.pandaVersion)
 
   const manifest: LibManifest = {
     schemaVersion: schemaVersion ?? DEFAULT_SCHEMA_VERSION,
@@ -76,13 +83,15 @@ export function writeLibManifest(options: WriteLibManifestOptions): WriteLibMani
   return { manifestPath, manifest }
 }
 
-function normalizePandaRange(declared: string, cwd: string): string {
+function normalizePandaRange(declared: string, cwd: string, providedVersion?: string): string {
   // workspace:* and similar pnpm/yarn-protocols → derive from installed version
   if (!declared || declared.startsWith('workspace:') || declared.includes('catalog:')) {
-    const installedVersion = lookupInstalledPandaVersion(cwd)
+    const installedVersion = providedVersion ?? lookupInstalledPandaVersion(cwd)
     if (installedVersion) {
       const major = installedVersion.split('.')[0]
-      return `^${major}.0.0`
+      if (major) {
+        return `^${major}.0.0`
+      }
     }
     // Fall back: just say any version, with a clear marker.
     return '*'
@@ -96,7 +105,11 @@ function lookupInstalledPandaVersion(cwd: string): string | undefined {
   while (true) {
     try {
       const pkg = JSON.parse(readFileSync(join(dir, 'node_modules', '@pandacss', 'dev', 'package.json'), 'utf-8'))
-      return pkg.version
+      const ver = pkg.version
+      if (typeof ver === 'string' && ver.length > 0) {
+        return ver
+      }
+      return undefined
     } catch {
       const parent = dirname(dir)
       if (parent === dir) return undefined

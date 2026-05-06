@@ -101,4 +101,27 @@ describe('writeLibManifest', () => {
       }),
     ).toThrow(/missing 'version'/)
   })
+
+  test('uses provided pandaVersion when given', () => {
+    writeFileSync(
+      join(tmpRoot, 'package.json'),
+      JSON.stringify({
+        name: '@panda-test/provided-version',
+        version: '0.1.0',
+        devDependencies: { '@pandacss/dev': 'workspace:*' },
+      }),
+    )
+
+    writeLibManifest({
+      cwd: tmpRoot,
+      outdir: 'dist',
+      preset: './preset.js',
+      buildinfo: './panda.buildinfo.json',
+      importMap: {},
+      pandaVersion: '3.7.1',
+    })
+
+    const written = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
+    expect(written.panda).toBe('^3.0.0')
+  })
 })
