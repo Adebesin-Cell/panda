@@ -547,10 +547,12 @@ export async function main() {
     .option('--outdir <dir>', 'Output directory for dist artifacts', { default: 'dist' })
     .option('--preset <path>', 'Path to preset file relative to manifest', { default: '../preset.ts' })
     .option('--silent', "Don't print any logs")
+    .option('-w, --watch', 'Watch src/ and rebuild')
+    .option('-p, --poll', 'Use polling instead of filesystem events when watching')
     .option('-c, --config <path>', 'Path to panda config file')
     .option('--cwd <cwd>', 'Current working directory', { default: cwd })
     .action(async (flags: LibCommandFlags = {}) => {
-      const { silent, outdir, preset, config: configPath } = flags
+      const { silent, outdir, preset, watch, poll, config: configPath } = flags
 
       if (silent) {
         logger.level = 'silent'
@@ -558,12 +560,39 @@ export async function main() {
 
       const cwd = resolve(flags.cwd!)
 
-      const ctx = await loadConfigAndCreateContext({
+      let ctx = await loadConfigAndCreateContext({
         cwd,
         configPath,
       })
 
       await buildLib(ctx, { outdir, preset })
+
+      if (watch) {
+        ctx.watchConfig(
+          async () => {
+            const affecteds = await ctx.diff.reloadConfigAndRefreshContext((conf) => {
+              ctx = new PandaContext(conf)
+            })
+
+            await ctx.hooks['config:change']?.({ config: ctx.config, changes: affecteds })
+            await buildLib(ctx, { outdir, preset })
+            logger.info('ctx:updated', 'lib rebuilt ✅')
+          },
+          { cwd, poll },
+        )
+
+        ctx.watchFiles(async (event, file) => {
+          if (event === 'unlink') {
+            ctx.project.removeSourceFile(ctx.runtime.path.abs(cwd, file))
+          } else if (event === 'change') {
+            ctx.project.reloadSourceFile(file)
+            await buildLib(ctx, { outdir, preset })
+          } else if (event === 'add') {
+            ctx.project.createSourceFile(file)
+            await buildLib(ctx, { outdir, preset })
+          }
+        })
+      }
     })
 
   cli
