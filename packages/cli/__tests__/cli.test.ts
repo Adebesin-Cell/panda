@@ -191,7 +191,8 @@ describe('CLI', () => {
     expect(debugConfigExists).toBeUndefined()
   })
 
-  test('ship', async () => {
+  test.skip('ship', async () => {
+    // Removed in OSS-2355 phase 3b — `panda ship` was folded into `panda lib`
     const cmd = `node ${binPath} ship --cwd="${testsCwd}"`
 
     // ship
@@ -203,7 +204,8 @@ describe('CLI', () => {
     expect(buildInfoExists).toBeUndefined()
   })
 
-  test('emit-pkg', async () => {
+  test.skip('emit-pkg', async () => {
+    // Removed in OSS-2355 phase 3b — `panda emit-pkg` was folded into `panda lib`
     const cmd = `node ${binPath} emit-pkg --cwd="${testsCwd}"`
 
     // emit-pkg
