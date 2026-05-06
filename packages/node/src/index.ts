@@ -1,5 +1,6 @@
 export { analyze } from './analyze'
 export { buildInfo } from './build-info'
+export { buildLib, type BuildLibOptions } from './lib-build'
 export { Builder } from './builder'
 export { codegen } from './codegen'
 export { loadConfigAndCreateContext } from './config'
