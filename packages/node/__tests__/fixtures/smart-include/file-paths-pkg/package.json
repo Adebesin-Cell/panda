@@ -1,0 +1,7 @@
+{
+  "name": "@panda-test/smart-file-paths",
+  "version": "1.0.0",
+  "private": true,
+  "files": ["dist/entry.js"],
+  "main": "dist/entry.js"
+}

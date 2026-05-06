@@ -16,6 +16,7 @@ beforeAll(() => {
   for (const [name, dir] of [
     ['smart-with-manifest', 'with-manifest-pkg'],
     ['smart-no-manifest', 'no-manifest-pkg'],
+    ['smart-file-paths', 'file-paths-pkg'],
   ] as const) {
     try {
       symlinkSync(join(fixturesRoot, dir), join(nm, name), 'dir')
@@ -66,5 +67,11 @@ describe('smart include — bare specifiers', () => {
     expect(() => {
       new PandaContext(makeConf(['@panda-test/does-not-exist']))
     }).not.toThrow()
+  })
+
+  test('package with file-path entries in files array resolves literally', () => {
+    const ctx = new PandaContext(makeConf(['@panda-test/smart-file-paths']))
+    const files = ctx.getFiles()
+    expect(files.some((f) => f.endsWith('file-paths-pkg/dist/entry.js'))).toBe(true)
   })
 })
