@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "panda": "^2.0.0",
   "preset": "./preset.js",
+  "presetExport": "default",
   "importMap": {
     "css": "@panda-test/valid-lib/css",
     "recipes": "@panda-test/valid-lib/recipes"
