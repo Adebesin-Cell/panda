@@ -155,12 +155,35 @@ export class PandaContext extends Generator {
     let pkgJsonPath: string
     try {
       pkgJsonPath = require.resolve(`${spec}/package.json`)
-    } catch (error) {
-      logger.warn(
-        'smartInclude',
-        `Cannot resolve bare specifier '${spec}' — neither a panda.lib.json nor a package.json found. Skipping.`,
-      )
-      return []
+    } catch {
+      // Fallback: many packages have an `exports` field that doesn't expose
+      // ./package.json. Resolve the package's main entry instead and walk up
+      // to find the owning package.json.
+      try {
+        const mainEntry = require.resolve(spec)
+        let dir = dirname(mainEntry)
+        let found: string | undefined
+        while (true) {
+          const candidate = join(dir, 'package.json')
+          if (this.runtime.fs.existsSync(candidate)) {
+            found = candidate
+            break
+          }
+          const parent = dirname(dir)
+          if (parent === dir) break
+          dir = parent
+        }
+        if (!found) {
+          throw new Error('package.json not found by walk-up')
+        }
+        pkgJsonPath = found
+      } catch (error) {
+        logger.warn(
+          'smartInclude',
+          `Cannot resolve bare specifier '${spec}' — neither a panda.lib.json nor a package.json (or main entry) found. Skipping.`,
+        )
+        return []
+      }
     }
 
     const pkgRoot = dirname(pkgJsonPath)
