@@ -81,6 +81,8 @@ export interface LibCommandFlags {
   preset?: string
   config?: string
   cwd?: string
+  watch?: boolean
+  poll?: boolean
 }
 
 export interface MainCommandFlags extends Pick<Config, 'cwd' | 'poll' | 'watch'> {
