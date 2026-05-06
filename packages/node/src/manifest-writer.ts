@@ -1,0 +1,106 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import type { LibManifest } from '@pandacss/types'
+
+export interface WriteLibManifestOptions {
+  /** The library package's root directory (cwd of the panda invocation). */
+  cwd: string
+  /** Where to write panda.lib.json (relative to cwd). Default: 'dist'. */
+  outdir: string
+  /** Path to the preset file, relative to the manifest. */
+  preset: string
+  /** Path to panda.buildinfo.json, relative to the manifest. */
+  buildinfo: string
+  /** Import map entry the manifest declares. */
+  importMap: LibManifest['importMap']
+  /** Optional fallback re-extract globs. */
+  files?: string[]
+  /** Override the manifest schema version. Default: 1. */
+  schemaVersion?: number
+}
+
+export interface WriteLibManifestResult {
+  manifestPath: string
+  manifest: LibManifest
+}
+
+const DEFAULT_SCHEMA_VERSION = 1
+
+/**
+ * Writes a `panda.lib.json` manifest into `<cwd>/<outdir>/panda.lib.json`.
+ *
+ * Reads the lib's `package.json` to derive `name`, `version`, and the
+ * panda peer range from `devDependencies['@pandacss/dev']`. The peer range
+ * is normalized: `workspace:*` becomes `^<major>.0.0` based on the
+ * installed @pandacss/dev version (looked up from node_modules); explicit
+ * semver ranges pass through.
+ */
+export function writeLibManifest(options: WriteLibManifestOptions): WriteLibManifestResult {
+  const { cwd, outdir, preset, buildinfo, importMap, files, schemaVersion } = options
+
+  const pkgPath = join(cwd, 'package.json')
+  let pkg: any
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+  } catch (error) {
+    throw new Error(`Cannot read package.json at '${pkgPath}'.`, { cause: error })
+  }
+
+  if (typeof pkg.name !== 'string') {
+    throw new Error(`package.json at '${pkgPath}' is missing 'name'.`)
+  }
+  if (typeof pkg.version !== 'string') {
+    throw new Error(`package.json at '${pkgPath}' is missing 'version'.`)
+  }
+
+  const declaredPandaRange = pkg.devDependencies?.['@pandacss/dev'] ?? pkg.peerDependencies?.['@pandacss/dev'] ?? ''
+  const pandaRange = normalizePandaRange(declaredPandaRange, cwd)
+
+  const manifest: LibManifest = {
+    schemaVersion: schemaVersion ?? DEFAULT_SCHEMA_VERSION,
+    name: pkg.name,
+    version: pkg.version,
+    panda: pandaRange,
+    preset,
+    importMap,
+    buildinfo,
+    ...(files && files.length > 0 ? { files } : {}),
+  }
+
+  const manifestDir = join(cwd, outdir)
+  mkdirSync(manifestDir, { recursive: true })
+
+  const manifestPath = join(manifestDir, 'panda.lib.json')
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+
+  return { manifestPath, manifest }
+}
+
+function normalizePandaRange(declared: string, cwd: string): string {
+  // workspace:* and similar pnpm/yarn-protocols → derive from installed version
+  if (!declared || declared.startsWith('workspace:') || declared.includes('catalog:')) {
+    const installedVersion = lookupInstalledPandaVersion(cwd)
+    if (installedVersion) {
+      const major = installedVersion.split('.')[0]
+      return `^${major}.0.0`
+    }
+    // Fall back: just say any version, with a clear marker.
+    return '*'
+  }
+  return declared
+}
+
+function lookupInstalledPandaVersion(cwd: string): string | undefined {
+  // Walk up from cwd looking for node_modules/@pandacss/dev/package.json
+  let dir = cwd
+  while (true) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, 'node_modules', '@pandacss', 'dev', 'package.json'), 'utf-8'))
+      return pkg.version
+    } catch {
+      const parent = dirname(dir)
+      if (parent === dir) return undefined
+      dir = parent
+    }
+  }
+}
