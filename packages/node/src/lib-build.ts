@@ -10,6 +10,12 @@ export interface BuildLibOptions {
   outdir?: string
   /** Path to preset file relative to manifest. Default: '../preset.ts'. */
   preset?: string
+  /**
+   * Pre-resolved @pandacss/dev version (e.g. '2.5.0'). When provided, skips
+   * the filesystem walk for installed version lookup inside the manifest
+   * writer. Useful for `panda lib --watch` to memoize across rebuilds.
+   */
+  pandaVersion?: string
 }
 
 const DEFAULT_OUTDIR = 'dist'
@@ -25,10 +31,10 @@ const DEFAULT_PRESET_PATH = '../preset.ts'
 export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {}): Promise<void> {
   const outdir = options.outdir ?? DEFAULT_OUTDIR
   const preset = options.preset ?? DEFAULT_PRESET_PATH
-  const cwd = ctx.config.cwd as string
+  const cwd = ctx.config.cwd ?? ctx.runtime.cwd()
 
   // Tell the encoder we're a lib, suppress designSystem hydration on this context
-  ;(ctx.config as any).libraryMode = true
+  ctx.config.libraryMode = true
 
   // Step 1: extract + ship buildinfo
   const buildinfoOutfile = join(cwd, outdir, 'panda.buildinfo.json')
@@ -42,6 +48,7 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
     preset,
     buildinfo: './panda.buildinfo.json',
     importMap,
+    pandaVersion: options.pandaVersion,
   })
   logger.info('lib', `wrote ${manifestPath}`)
 
