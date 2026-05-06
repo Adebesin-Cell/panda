@@ -91,13 +91,6 @@ export interface MainCommandFlags extends Pick<Config, 'cwd' | 'poll' | 'watch'>
   logfile?: string
 }
 
-export interface EmitPackageCommandFlags {
-  outdir: string
-  silent?: boolean
-  cwd: string
-  base?: string
-}
-
 export interface McpCommandFlags {
   cwd?: string
   config?: string
