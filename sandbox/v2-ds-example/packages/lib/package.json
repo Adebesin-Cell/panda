@@ -1,0 +1,23 @@
+{
+  "name": "@v2-ds-example/lib",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "files": ["src", "dist", "preset.ts"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./preset": "./preset.ts",
+    "./panda.lib.json": "./dist/panda.lib.json",
+    "./panda.buildinfo.json": "./dist/panda.buildinfo.json"
+  },
+  "scripts": {
+    "css:gen": "panda codegen",
+    "css:ship": "panda ship --outfile dist/panda.buildinfo.json"
+  },
+  "dependencies": {
+    "@v2-ds-example/styled-system": "workspace:*"
+  },
+  "devDependencies": {
+    "@pandacss/dev": "workspace:*"
+  }
+}
