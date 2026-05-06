@@ -3,7 +3,10 @@ import { defineConfig } from '@pandacss/dev'
 export default defineConfig({
   preflight: true,
   designSystem: '@v2-ds-example/lib',
-  include: ['./src/**/*.{ts,tsx}'],
+  include: [
+    './src/**/*.{ts,tsx}',
+    '@v2-ds-example/lib', // smart-include: package has panda.lib.json, will be skipped (designSystem handles it)
+  ],
   exclude: [],
   outdir: '@v2-ds-example/styled-system',
   theme: {
