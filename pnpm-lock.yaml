@@ -589,6 +589,12 @@ importers:
         specifier: 8.0.1
         version: 8.0.1
 
+  packages/node/__tests__/fixtures/smart-include/file-paths-pkg: {}
+
+  packages/node/__tests__/fixtures/smart-include/no-manifest-pkg: {}
+
+  packages/node/__tests__/fixtures/smart-include/with-manifest-pkg: {}
+
   packages/parser:
     dependencies:
       '@pandacss/config':
@@ -1519,6 +1525,9 @@ importers:
 
   sandbox/v2-ds-example/packages/app:
     dependencies:
+      '@v2-ds-example/charts':
+        specifier: workspace:*
+        version: link:../charts
       '@v2-ds-example/lib':
         specifier: workspace:*
         version: link:../lib
@@ -1529,6 +1538,12 @@ importers:
       '@pandacss/dev':
         specifier: workspace:*
         version: link:../../../../packages/cli
+
+  sandbox/v2-ds-example/packages/charts:
+    dependencies:
+      '@v2-ds-example/styled-system':
+        specifier: workspace:*
+        version: link:../styled-system
 
   sandbox/v2-ds-example/packages/lib:
     dependencies:
