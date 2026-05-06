@@ -8,6 +8,7 @@
     "css": "panda"
   },
   "dependencies": {
+    "@v2-ds-example/charts": "workspace:*",
     "@v2-ds-example/lib": "workspace:*",
     "@v2-ds-example/styled-system": "workspace:*"
   },

@@ -1,0 +1,14 @@
+{
+  "name": "@v2-ds-example/charts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "files": ["dist"],
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "dependencies": {
+    "@v2-ds-example/styled-system": "workspace:*"
+  }
+}
