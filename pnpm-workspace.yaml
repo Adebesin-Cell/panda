@@ -2,5 +2,7 @@ packages:
   - 'packages/**'
   - 'sandbox/*'
   - 'sandbox/component-lib/**'
+  - 'sandbox/v2-ds-fixture/**'
+  - 'sandbox/v2-ds-example/**'
   - 'playground'
   - 'website'
