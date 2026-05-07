@@ -1,5 +1,5 @@
 import { omit, pick, traverse } from '@pandacss/shared'
-import type { Config, PandaHooks, Preset } from '@pandacss/types'
+import type { Config, LoadConfigResult, PandaHooks, Preset } from '@pandacss/types'
 import { dirname, isAbsolute, join } from 'node:path'
 import { bundle } from './bundle-config'
 import { readLibManifest } from './lib-manifest'
@@ -87,10 +87,9 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
         seenRefs.add(presetConfig)
       }
 
-      // Call preset:resolved hook if available
       if (hooks?.['preset:resolved']) {
         const resolvedPreset = await hooks['preset:resolved']({
-          preset: presetConfig as Preset,
+          preset: presetConfig as unknown as LoadConfigResult['config'],
           name: presetName,
           utils: hookUtils,
         })
