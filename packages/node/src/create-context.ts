@@ -76,7 +76,7 @@ export class PandaContext extends Generator {
     let buildinfoRaw: string
     try {
       buildinfoRaw = readFileSync(buildinfoPath, 'utf-8')
-    } catch (error) {
+    } catch {
       logger.warn(
         'designSystem',
         `Could not read buildinfo at '${buildinfoPath}' for '${packageName}'. The library's buildinfo will not be hydrated.`,
@@ -87,7 +87,7 @@ export class PandaContext extends Generator {
     let parsed: unknown
     try {
       parsed = JSON.parse(buildinfoRaw)
-    } catch (error) {
+    } catch {
       logger.warn('designSystem', `Buildinfo at '${buildinfoPath}' is not valid JSON. Skipping hydration.`)
       return
     }
@@ -140,7 +140,9 @@ export class PandaContext extends Generator {
     try {
       require.resolve(`${spec}/panda.lib.json`)
       return []
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     let pkgJsonPath: string
     try {
@@ -164,7 +166,7 @@ export class PandaContext extends Generator {
           throw new Error('package.json not found by walk-up')
         }
         pkgJsonPath = found
-      } catch (error) {
+      } catch {
         logger.warn(
           'smartInclude',
           `Cannot resolve bare specifier '${spec}' — neither a panda.lib.json nor a package.json (or main entry) found. Skipping.`,
