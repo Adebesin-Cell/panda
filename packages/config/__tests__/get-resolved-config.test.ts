@@ -17,6 +17,7 @@ beforeAll(() => {
   for (const [name, dir] of [
     ['valid-lib', 'valid-pkg'],
     ['no-manifest', 'no-manifest-pkg'],
+    ['with-preset-export', 'with-preset-export-pkg'],
   ] as const) {
     try {
       symlinkSync(join(fixturesRoot, dir), join(nm, name), 'dir')
@@ -109,5 +110,23 @@ describe('getResolvedConfig with designSystem', () => {
     await expect(getResolvedConfig(config as any, tmpRoot)).rejects.toThrow(
       /Cannot resolve '@panda-test\/no-manifest\/panda\.lib\.json'/,
     )
+  })
+
+  test('extracts the named preset via manifest.presetExport instead of relying on heuristics', async () => {
+    // The with-preset-export fixture has presetExport: 'examplePreset' in its manifest,
+    // and its preset.js exports `{ examplePreset: {...} }` (no default). Phase 3c routes
+    // this through a direct property lookup rather than the old name-walking heuristic.
+    const config = {
+      designSystem: '@panda-test/with-preset-export',
+      include: [],
+    }
+
+    const resolved = await getResolvedConfig(config as any, tmpRoot)
+
+    const presetNames = resolved.presets!.map((p: any) => p.name).filter(Boolean)
+    expect(presetNames).toContain('@panda-test/with-preset-export/preset')
+
+    const tokens = resolved.theme?.extend?.tokens || resolved.theme?.tokens
+    expect((tokens as any)?.colors?.namedBrand?.value).toBe('#aabbcc')
   })
 })

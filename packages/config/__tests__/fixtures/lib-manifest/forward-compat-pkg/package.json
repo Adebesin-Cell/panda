@@ -1,0 +1,8 @@
+{
+  "name": "@panda-test/forward-compat",
+  "version": "1.0.0",
+  "exports": {
+    "./panda.lib.json": "./dist/panda.lib.json",
+    "./panda.buildinfo.json": "./dist/panda.buildinfo.json"
+  }
+}

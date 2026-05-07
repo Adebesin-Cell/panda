@@ -26,6 +26,7 @@ beforeAll(() => {
   link('wrong-type', 'wrong-type-pkg')
   link('with-preset-export', 'with-preset-export-pkg')
   link('wrong-preset-export', 'wrong-preset-export-pkg')
+  link('forward-compat', 'forward-compat-pkg')
 })
 
 afterAll(() => {
@@ -75,5 +76,16 @@ describe('readLibManifest', () => {
 
   test("throws when 'presetExport' is not a string", () => {
     expect(() => readLibManifest('@panda-test/wrong-preset-export', tmpRoot)).toThrow(/'presetExport' must be a string/)
+  })
+
+  test('forward compat: ignores unknown manifest fields without throwing', () => {
+    // Manifest declares schemaVersion: 1 but also has fields a future panda might add
+    // (futureField, anotherUnknown). Today's reader should accept it and just ignore them.
+    const result = readLibManifest('@panda-test/forward-compat', tmpRoot)
+    expect(result.manifest.name).toBe('@panda-test/forward-compat')
+    expect(result.manifest.schemaVersion).toBe(1)
+    // Unknown fields are preserved on the parsed object — readers can choose to use them
+    // or ignore them. Older panda just doesn't look at them.
+    expect((result.manifest as any).futureField).toBe('v2-only-field')
   })
 })
