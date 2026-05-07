@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -230,5 +230,53 @@ export const myPreset = { name: 'my-design-system', theme: { extend: { tokens } 
     const second = readFileSync(join(tmpRoot, 'dist', 'preset.mjs'), 'utf-8')
 
     expect(second).toBe(first)
+  })
+})
+
+describe('buildLib — chain composition', () => {
+  // The valid-pkg fixture's buildinfo contains exactly one atomic hash:
+  // `color]___[value:libBrand`. Any child that hydrates this parent should
+  // see that hash propagate into its own buildinfo output.
+  const parentFixture = join(__dirname, '../../config/__tests__/fixtures/lib-manifest/valid-pkg')
+  const PARENT_HASH = 'color]___[value:libBrand'
+
+  function linkParent(name = 'valid-lib') {
+    const nm = join(tmpRoot, 'node_modules', '@panda-test')
+    mkdirSync(nm, { recursive: true })
+    try {
+      symlinkSync(parentFixture, join(nm, name), 'dir')
+    } catch (e: any) {
+      if (e.code !== 'EEXIST') throw e
+    }
+  }
+
+  test("child's buildinfo includes parent's hashes when child uses designSystem", async () => {
+    linkParent()
+    const ctx = makeCtx(tmpRoot, { designSystem: '@panda-test/valid-lib' })
+    await buildLib(ctx, { outdir: 'dist' })
+
+    const buildinfo = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.buildinfo.json'), 'utf-8'))
+    expect(buildinfo.styles.atomic).toContain(PARENT_HASH)
+  })
+
+  test('child without its own styles still emits parent hashes (chain pass-through)', async () => {
+    linkParent()
+    // Replace the default src that emits styles — child has no styles of its own.
+    writeFileSync(join(tmpRoot, 'src/index.ts'), `// no panda usage`)
+
+    const ctx = makeCtx(tmpRoot, { designSystem: '@panda-test/valid-lib' })
+    await buildLib(ctx, { outdir: 'dist' })
+
+    const buildinfo = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.buildinfo.json'), 'utf-8'))
+    expect(buildinfo.styles.atomic).toContain(PARENT_HASH)
+  })
+
+  test('does not throw when designSystem references a missing parent — falls back to own styles', async () => {
+    // No symlink — parent doesn't exist in node_modules.
+    const ctx = makeCtx(tmpRoot, { designSystem: '@panda-test/missing' })
+    await expect(buildLib(ctx, { outdir: 'dist' })).resolves.not.toThrow()
+
+    const buildinfo = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.buildinfo.json'), 'utf-8'))
+    expect(buildinfo.styles.atomic).not.toContain(PARENT_HASH)
   })
 })
