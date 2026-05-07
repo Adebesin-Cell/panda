@@ -432,8 +432,6 @@ interface PresetOptions {
   presets?: (string | Preset | Promise<Preset>)[]
   /** Resolves a panda design-system library by package name (reads its `panda.lib.json`). */
   designSystem?: string
-  /** @internal Skips upstream `designSystem` hydration; set by `panda lib`. */
-  libraryMode?: boolean
 }
 
 export interface HooksOptions {

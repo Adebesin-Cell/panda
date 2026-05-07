@@ -24,8 +24,6 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   const presetSource = options.preset ?? DEFAULT_PRESET_SOURCE
   const cwd = ctx.config.cwd ?? ctx.runtime.cwd()
 
-  ctx.config.libraryMode = true
-
   const buildinfoOutfile = join(cwd, outdir, 'panda.buildinfo.json')
   await buildInfo(ctx, buildinfoOutfile)
 
