@@ -135,7 +135,7 @@ export class PandaContext extends Generator {
   }
 
   private resolveBareSpecifier(spec: string, cwd: string): string[] {
-    const require = createRequire(`${cwd}/noop.js`)
+    const require = createRequire(join(cwd, 'noop.js'))
 
     try {
       require.resolve(`${spec}/panda.lib.json`)

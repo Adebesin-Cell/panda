@@ -37,7 +37,7 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   const presetCompiled = await compilePreset(presetSourceAbs, presetOutAbs)
   const presetForManifest = presetCompiled ? presetOutRelManifest : presetSource
 
-  const libPresetName = findLibPresetName(ctx.config.presets as any[])
+  const libPresetName = findLibPresetName(ctx.config.presets)
   const presetExport = await detectPresetExport(cwd, outdir, presetForManifest, libPresetName)
 
   const importMap = normalizeImportMap(ctx.config.importMap)
@@ -93,10 +93,10 @@ function findLibPresetName(presets: unknown[] | undefined): string | undefined {
   const builtinNames = new Set(['@pandacss/preset-base', '@pandacss/preset-panda'])
 
   for (let i = presets.length - 1; i >= 0; i--) {
-    const p = presets[i] as any
-    if (p && typeof p === 'object' && typeof p.name === 'string' && !builtinNames.has(p.name)) {
-      return p.name
-    }
+    const p = presets[i]
+    if (!p || typeof p !== 'object') continue
+    const name = (p as { name?: unknown }).name
+    if (typeof name === 'string' && !builtinNames.has(name)) return name
   }
 
   return undefined
@@ -110,36 +110,44 @@ async function detectPresetExport(
 ): Promise<string | undefined> {
   if (!libPresetName) return undefined
 
-  const manifestRelPath = isAbsolute(presetPathRelativeToManifest)
-    ? presetPathRelativeToManifest
-    : join(cwd, outdir, presetPathRelativeToManifest)
-  const cwdRelPath = isAbsolute(presetPathRelativeToManifest)
-    ? presetPathRelativeToManifest
-    : join(cwd, presetPathRelativeToManifest)
+  let resolved: string | undefined
+  if (isAbsolute(presetPathRelativeToManifest)) {
+    resolved = existsSync(presetPathRelativeToManifest) ? presetPathRelativeToManifest : undefined
+  } else {
+    const manifestRel = join(cwd, outdir, presetPathRelativeToManifest)
+    const cwdRel = join(cwd, presetPathRelativeToManifest)
+    if (existsSync(manifestRel)) resolved = manifestRel
+    else if (existsSync(cwdRel)) resolved = cwdRel
+  }
+
+  if (!resolved) {
+    logger.warn(
+      'lib',
+      `preset not found at '${presetPathRelativeToManifest}' (relative to manifest or cwd) — manifest will omit presetExport`,
+    )
+    return undefined
+  }
 
   let bundled: { config: any; dependencies: string[] }
   try {
-    bundled = await bundle(manifestRelPath, cwd)
-  } catch {
-    try {
-      bundled = await bundle(cwdRelPath, cwd)
-    } catch (e) {
-      logger.warn(
-        'lib',
-        `could not bundle preset at '${cwdRelPath}' to detect export name — manifest will omit presetExport: ${String(e)}`,
-      )
-      return undefined
-    }
+    bundled = await bundle(resolved, cwd)
+  } catch (e) {
+    logger.warn(
+      'lib',
+      `could not bundle preset at '${resolved}' to detect export name — manifest will omit presetExport: ${String(e)}`,
+    )
+    return undefined
   }
 
   const candidate = bundled?.config
   if (!candidate || typeof candidate !== 'object') return undefined
 
-  if ((candidate as any).name === libPresetName) return 'default'
+  const candidateRecord = candidate as Record<string, unknown>
+  if ((candidateRecord.name as string | undefined) === libPresetName) return 'default'
 
-  for (const [key, value] of Object.entries(candidate)) {
+  for (const [key, value] of Object.entries(candidateRecord)) {
     if (key === 'default') continue
-    if (value && typeof value === 'object' && (value as any).name === libPresetName) {
+    if (value && typeof value === 'object' && (value as { name?: string }).name === libPresetName) {
       return key
     }
   }

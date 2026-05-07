@@ -15,11 +15,15 @@ const hookUtils = {
 }
 
 /**
- * Recursively merge all presets into a single config (depth-first using stack)
+ * Recursively merge all presets into a single config (depth-first using stack).
+ * The input config is not mutated — `panda lib --watch` reuses the same config
+ * across rebuilds and would accumulate prepended designSystem presets otherwise.
  */
 export async function getResolvedConfig(config: ExtendableConfig, cwd: string, hooks?: Partial<PandaHooks>) {
-  if (config.designSystem) {
-    const { manifest, manifestPath } = readLibManifest(config.designSystem, cwd)
+  const root: ExtendableConfig = { ...config }
+
+  if (root.designSystem) {
+    const { manifest, manifestPath } = readLibManifest(root.designSystem, cwd)
 
     const presetPath = isAbsolute(manifest.preset) ? manifest.preset : join(dirname(manifestPath), manifest.preset)
     const presetModule = await bundle(presetPath, cwd)
@@ -34,31 +38,29 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
 
     if (!designSystemPreset) {
       throw new Error(
-        `designSystem '${config.designSystem}': preset file does not export '${exportName}'. ` +
+        `designSystem '${root.designSystem}': preset file does not export '${exportName}'. ` +
           `Check the manifest's 'presetExport' field or that the preset file has a default export.`,
       )
     }
 
-    config.presets = [designSystemPreset, ...(config.presets ?? [])]
+    root.presets = [designSystemPreset, ...(root.presets ?? [])]
 
-    const consumerImportMap = config.importMap
+    const consumerImportMap = root.importMap
     if (consumerImportMap === undefined) {
-      config.importMap = manifest.importMap
+      root.importMap = manifest.importMap
     } else if (Array.isArray(consumerImportMap)) {
-      config.importMap = [...consumerImportMap, manifest.importMap]
+      root.importMap = [...consumerImportMap, manifest.importMap]
     } else {
-      config.importMap = [consumerImportMap, manifest.importMap]
+      root.importMap = [consumerImportMap, manifest.importMap]
     }
   }
 
-  const stack: ExtendableConfig[] = [config]
+  const stack: ExtendableConfig[] = [root]
   const configs: ExtendableConfig[] = []
 
-  // Cycle detection. Tracks preset identity by name (for string specifiers and
-  // named preset objects) and falls back to object reference. Without this,
-  // a preset whose `presets` array transitively references itself would loop
-  // forever.
-  const seenNames = new Set<string>()
+  // String specifiers dedup by specifier; object presets dedup by identity.
+  // Two distinct presets sharing a `name` both flow through.
+  const seenStrings = new Set<string>()
   const seenRefs = new WeakSet<object>()
 
   while (stack.length > 0) {
@@ -70,27 +72,25 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
       let presetName: string
 
       if (typeof subPreset === 'string') {
-        if (seenNames.has(subPreset)) continue
+        if (seenStrings.has(subPreset)) continue
+        seenStrings.add(subPreset)
         const presetModule = await bundle(subPreset, cwd)
         presetConfig = presetModule.config
         presetName = subPreset
       } else {
         presetConfig = await subPreset
-        presetName = (presetConfig as any).name || 'unknown-preset'
+        presetName = (presetConfig as Preset).name || 'unknown-preset'
       }
 
-      const namedKey = (presetConfig as any)?.name as string | undefined
-      if (namedKey && seenNames.has(namedKey)) continue
-      if (typeof presetConfig === 'object' && presetConfig !== null && seenRefs.has(presetConfig)) continue
-
-      seenNames.add(presetName)
-      if (namedKey) seenNames.add(namedKey)
-      if (typeof presetConfig === 'object' && presetConfig !== null) seenRefs.add(presetConfig)
+      if (typeof presetConfig === 'object' && presetConfig !== null) {
+        if (seenRefs.has(presetConfig)) continue
+        seenRefs.add(presetConfig)
+      }
 
       // Call preset:resolved hook if available
       if (hooks?.['preset:resolved']) {
         const resolvedPreset = await hooks['preset:resolved']({
-          preset: presetConfig as any,
+          preset: presetConfig as Preset,
           name: presetName,
           utils: hookUtils,
         })
