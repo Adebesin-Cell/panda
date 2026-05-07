@@ -1,24 +1,27 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { bundle } from '@pandacss/config'
 import { logger } from '@pandacss/logger'
+import { build as esbuild } from 'esbuild'
 import { buildInfo } from './build-info'
 import type { PandaContext } from './create-context'
 import { writeLibManifest } from './manifest-writer'
 
 export interface BuildLibOptions {
   outdir?: string
+  /** Path to the source preset file, relative to the manifest at `<outdir>/panda.lib.json`. */
   preset?: string
   /** Pre-resolved @pandacss/dev version. Skips the node_modules walk in the writer. */
   pandaVersion?: string
 }
 
 const DEFAULT_OUTDIR = 'dist'
-const DEFAULT_PRESET_PATH = '../preset.ts'
+const DEFAULT_PRESET_SOURCE = '../preset.ts'
+const COMPILED_PRESET_FILENAME = 'preset.mjs'
 
 export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {}): Promise<void> {
   const outdir = options.outdir ?? DEFAULT_OUTDIR
-  const preset = options.preset ?? DEFAULT_PRESET_PATH
+  const presetSource = options.preset ?? DEFAULT_PRESET_SOURCE
   const cwd = ctx.config.cwd ?? ctx.runtime.cwd()
 
   ctx.config.libraryMode = true
@@ -29,14 +32,21 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   const pkgPath = join(cwd, 'package.json')
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
 
+  const presetSourceAbs = isAbsolute(presetSource) ? presetSource : join(cwd, outdir, presetSource)
+  const presetOutAbs = join(cwd, outdir, COMPILED_PRESET_FILENAME)
+  const presetOutRelManifest = `./${COMPILED_PRESET_FILENAME}`
+
+  const presetCompiled = await compilePreset(presetSourceAbs, presetOutAbs)
+  const presetForManifest = presetCompiled ? presetOutRelManifest : presetSource
+
   const libPresetName = findLibPresetName(ctx.config.presets as any[])
-  const presetExport = await detectPresetExport(cwd, outdir, preset, libPresetName)
+  const presetExport = await detectPresetExport(cwd, outdir, presetForManifest, libPresetName)
 
   const importMap = normalizeImportMap(ctx.config.importMap)
   const { manifestPath } = writeLibManifest({
     cwd,
     outdir,
-    preset,
+    preset: presetForManifest,
     buildinfo: './panda.buildinfo.json',
     importMap,
     pandaVersion: options.pandaVersion,
@@ -45,7 +55,38 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   })
   logger.info('lib', `wrote ${manifestPath}`)
 
-  patchPackageExports(pkgPath, pkg, outdir)
+  patchPackageExports(pkgPath, pkg, outdir, presetCompiled)
+}
+
+async function compilePreset(sourceAbs: string, outAbs: string): Promise<boolean> {
+  if (!existsSync(sourceAbs)) {
+    logger.warn(
+      'lib',
+      `preset source not found at '${sourceAbs}' — manifest will reference it as-is and consumers must resolve it`,
+    )
+    return false
+  }
+
+  try {
+    await esbuild({
+      entryPoints: [sourceAbs],
+      outfile: outAbs,
+      bundle: true,
+      packages: 'external',
+      format: 'esm',
+      platform: 'node',
+      target: 'node18',
+      logLevel: 'silent',
+    })
+    logger.info('lib', `compiled preset → ${outAbs}`)
+    return true
+  } catch (e) {
+    logger.warn(
+      'lib',
+      `failed to compile preset at '${sourceAbs}': ${String(e)}. manifest will reference the source file instead.`,
+    )
+    return false
+  }
 }
 
 function findLibPresetName(presets: unknown[] | undefined): string | undefined {
@@ -135,12 +176,16 @@ function normalizeImportMap(importMap: unknown): Record<string, string> {
   return {}
 }
 
-function patchPackageExports(pkgPath: string, pkg: any, outdir: string): void {
+function patchPackageExports(pkgPath: string, pkg: any, outdir: string, presetCompiled: boolean): void {
   const exports = pkg.exports ?? {}
 
   const wanted: Record<string, string> = {
     './panda.lib.json': `./${outdir}/panda.lib.json`,
     './panda.buildinfo.json': `./${outdir}/panda.buildinfo.json`,
+  }
+
+  if (presetCompiled) {
+    wanted['./preset'] = `./${outdir}/${COMPILED_PRESET_FILENAME}`
   }
 
   let changed = false

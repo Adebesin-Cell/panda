@@ -10,7 +10,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./preset": "./preset.ts",
+    "./preset": "./dist/preset.mjs",
     "./panda.buildinfo.json": "./dist/panda.buildinfo.json",
     "./panda.lib.json": "./dist/panda.lib.json"
   },
