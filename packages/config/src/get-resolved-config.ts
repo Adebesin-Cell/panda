@@ -54,6 +54,13 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
   const stack: ExtendableConfig[] = [config]
   const configs: ExtendableConfig[] = []
 
+  // Cycle detection. Tracks preset identity by name (for string specifiers and
+  // named preset objects) and falls back to object reference. Without this,
+  // a preset whose `presets` array transitively references itself would loop
+  // forever.
+  const seenNames = new Set<string>()
+  const seenRefs = new WeakSet<object>()
+
   while (stack.length > 0) {
     const current = stack.pop()!
 
@@ -63,6 +70,7 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
       let presetName: string
 
       if (typeof subPreset === 'string') {
+        if (seenNames.has(subPreset)) continue
         const presetModule = await bundle(subPreset, cwd)
         presetConfig = presetModule.config
         presetName = subPreset
@@ -70,6 +78,14 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
         presetConfig = await subPreset
         presetName = (presetConfig as any).name || 'unknown-preset'
       }
+
+      const namedKey = (presetConfig as any)?.name as string | undefined
+      if (namedKey && seenNames.has(namedKey)) continue
+      if (typeof presetConfig === 'object' && presetConfig !== null && seenRefs.has(presetConfig)) continue
+
+      seenNames.add(presetName)
+      if (namedKey) seenNames.add(namedKey)
+      if (typeof presetConfig === 'object' && presetConfig !== null) seenRefs.add(presetConfig)
 
       // Call preset:resolved hook if available
       if (hooks?.['preset:resolved']) {

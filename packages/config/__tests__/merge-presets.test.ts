@@ -314,4 +314,28 @@ describe('mergeConfigs / presets', () => {
       }
     `)
   })
+
+  test('terminates on direct self-reference in presets array', async () => {
+    const presetA: any = { name: 'preset-a', theme: { extend: { tokens: { colors: { a: { value: '#a' } } } } } }
+    presetA.presets = [presetA]
+
+    const config = defineConfig({ presets: [presetA] })
+
+    // Without cycle detection the resolver's stack-walk would loop forever.
+    await expect(getResolvedConfig(config, 'src')).resolves.toBeDefined()
+  })
+
+  test('terminates on mutual reference between two presets', async () => {
+    const presetA: any = { name: 'preset-a', theme: { extend: { tokens: { colors: { a: { value: '#a' } } } } } }
+    const presetB: any = { name: 'preset-b', theme: { extend: { tokens: { colors: { b: { value: '#b' } } } } } }
+    presetA.presets = [presetB]
+    presetB.presets = [presetA]
+
+    const config = defineConfig({ presets: [presetA] })
+    const resolved = await getResolvedConfig(config, 'src')
+
+    const tokens = (resolved.theme?.extend?.tokens || resolved.theme?.tokens) as any
+    expect(tokens?.colors?.a?.value).toBe('#a')
+    expect(tokens?.colors?.b?.value).toBe('#b')
+  })
 })
