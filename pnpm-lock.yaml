@@ -210,6 +210,10 @@ importers:
 
   packages/config/__tests__/fixtures/lib-manifest/valid-pkg: {}
 
+  packages/config/__tests__/fixtures/lib-manifest/with-preset-export-pkg: {}
+
+  packages/config/__tests__/fixtures/lib-manifest/wrong-preset-export-pkg: {}
+
   packages/config/__tests__/fixtures/lib-manifest/wrong-type-pkg: {}
 
   packages/config/__tests__/samples/cjs:
@@ -512,6 +516,9 @@ importers:
       chokidar:
         specifier: 4.0.3
         version: 4.0.3
+      esbuild:
+        specifier: 0.27.0
+        version: 0.27.0
       fast-glob:
         specifier: 3.3.3
         version: 3.3.3
@@ -38412,7 +38419,7 @@ snapshots:
 
   vite@7.3.2(@types/node@24.10.1)(jiti@2.6.1)(less@4.4.2)(lightningcss@1.31.1)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.1):
     dependencies:
-      esbuild: 0.27.7
+      esbuild: 0.27.0
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
       postcss: 8.5.6

@@ -10,7 +10,8 @@ OSS-2355: introduce `panda lib` for design-system authors. Removes `panda ship` 
 The new `panda lib` command produces a complete `dist/`:
 - `panda.buildinfo.json` (from the old `panda ship`)
 - `panda.lib.json` (new — design-system manifest)
-- updated `package.json` exports (from the old `panda emit-pkg`)
+- `preset.mjs` (new — compiled preset, so consumers don't need the source `preset.ts` shipped)
+- updated `package.json` exports including `./preset` → `./dist/preset.mjs`
 
 Migration:
 
