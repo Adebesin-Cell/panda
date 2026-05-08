@@ -113,9 +113,8 @@ describe('getResolvedConfig with designSystem', () => {
   })
 
   test('extracts the named preset via manifest.presetExport instead of relying on heuristics', async () => {
-    // The with-preset-export fixture has presetExport: 'examplePreset' in its manifest,
-    // and its preset.js exports `{ examplePreset: {...} }` (no default). Phase 3c routes
-    // this through a direct property lookup rather than the old name-walking heuristic.
+    // Fixture has presetExport: 'examplePreset' in its manifest and exports
+    // `{ examplePreset: {...} }` with no default — direct property lookup wins.
     const config = {
       designSystem: '@panda-test/with-preset-export',
       include: [],

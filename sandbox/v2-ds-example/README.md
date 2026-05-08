@@ -1,18 +1,20 @@
 # v2-ds-example
 
-minimal sandbox for the `designSystem` config key (oss-2355).
+depth-1 sandbox for the `designSystem` config key.
 
-demonstrates how a consumer app can reference a design system package with a single config field — `designSystem: '@v2-ds-example/lib'` — instead of wiring up four separate fields manually. also shows token override semantics: the consumer's `brand` color wins over the lib's.
+demonstrates how a consumer app references a design system package with a single config field — `designSystem: '@v2-ds-example/lib'` — instead of wiring `presets`, `importMap`, `outdir`, and `include`-with-buildinfo manually. also shows token override semantics: the consumer's `brand` color wins over the lib's.
 
 ## what's in here
 
-three packages:
+three workspace packages:
 
 - `packages/styled-system` — `@v2-ds-example/styled-system`, the shared runtime (generated code lives here)
-- `packages/lib` — `@v2-ds-example/lib`, the design system. has a preset, two components, and a hand-written manifest
-- `packages/app` — `@v2-ds-example/app`, the consumer. uses `designSystem:` and overrides one token
+- `packages/lib` — `@v2-ds-example/lib`, the design system. has a preset and one component
+- `packages/app` — `@v2-ds-example/app`, the consumer. uses `designSystem` and overrides one token
 
-chain composition (multiple design systems stacked) is covered separately in `sandbox/v2-ds-fixture/`. this sandbox focuses on the single-lib case.
+a fourth package, `packages/charts`, simulates a non-panda npm dep that the consumer auto-globs via smart include.
+
+chain composition (libs stacked) is covered in `sandbox/v2-ds-fixture/`.
 
 ## setup
 
@@ -24,8 +26,6 @@ pnpm install --ignore-scripts
 
 ## run order
 
-each step depends on the previous one. run them in order.
-
 **step 1 — generate the shared runtime**
 
 ```bash
@@ -33,62 +33,53 @@ cd sandbox/v2-ds-example/packages/styled-system
 pnpm panda codegen
 ```
 
-this produces the base `css`, `recipes`, `patterns` exports in `packages/styled-system/`.
-
-**step 2 — generate the lib's css and ship the buildinfo**
+**step 2 — build the lib's dist artifacts**
 
 ```bash
 cd sandbox/v2-ds-example/packages/lib
-pnpm panda codegen
-pnpm panda ship --outfile dist/panda.buildinfo.json
+pnpm panda lib
 ```
 
-`panda codegen` picks up the lib's source files (`src/button.ts`) and resolves the preset. `panda ship` writes `dist/panda.buildinfo.json` — this is the artifact a consumer reads to know which styles the lib already owns, so it doesn't re-emit them.
+`panda lib` produces `dist/panda.lib.json` (manifest), `dist/panda.buildinfo.json`, `dist/preset.mjs` (compiled preset), and patches `package.json` exports.
 
 **step 3 — generate the consumer's css**
 
 ```bash
 cd sandbox/v2-ds-example/packages/app
-pnpm panda codegen
 pnpm panda
 ```
 
-the consumer reads `designSystem: '@v2-ds-example/lib'`, resolves the manifest at `@v2-ds-example/lib/panda.lib.json`, pulls in the preset, and merges the consumer's own theme on top. the consumer's `brand: #ec4899` overrides the lib's `brand: #3b82f6`.
+the consumer reads `designSystem: '@v2-ds-example/lib'`, resolves the manifest, pulls the preset, hydrates the encoder from buildinfo, and merges the consumer's own theme on top. the consumer's `brand: #ec4899` overrides the lib's `brand: #3b82f6`.
 
 ## what to look for
-
-after step 3, grep the consumer's generated css:
 
 ```bash
 grep -E '\-\-colors\-(brand|surface):' \
   sandbox/v2-ds-example/packages/app/@v2-ds-example/styled-system/styles.css
 ```
 
-expected output:
+expected:
 
 ```
 --colors-brand: #ec4899;    ← consumer override wins
 --colors-surface: #f8fafc;  ← from the lib preset
 ```
 
-also check the recipe traveled:
+also check the recipe extracts:
 
 ```bash
 grep 'example-button' \
   sandbox/v2-ds-example/packages/app/@v2-ds-example/styled-system/styles.css | head -3
 ```
 
-you should see `.example-button` rules — this confirms the `button` recipe from the lib preset made it through.
+`.example-button` classes confirm the recipe traveled from lib preset → consumer css.
 
-if `--colors-brand` is `#3b82f6` (the lib's value), the override semantics are broken.
+## v1 config vs v2
 
-## v1 config vs new config
+**v1 — four manual fields:**
 
-**before (v1 — four manual fields):**
-
-```typescript
+```ts
 export default defineConfig({
-  preflight: true,
   presets: ['@pandacss/dev/presets', examplePreset],
   importMap: '@v2-ds-example/styled-system',
   include: [
@@ -99,55 +90,26 @@ export default defineConfig({
 })
 ```
 
-**after (v2 — one field):**
+**v2 — one field:**
 
-```typescript
+```ts
 export default defineConfig({
-  preflight: true,
   designSystem: '@v2-ds-example/lib',
   include: ['./src/**/*.{ts,tsx}'],
   outdir: '@v2-ds-example/styled-system',
 })
 ```
 
-panda resolves the manifest, wires up the preset, and adds the buildinfo path to `include` automatically.
-
-## the manifest format
-
-`packages/lib/dist/panda.lib.json` — hand-written here, would be auto-generated by `panda lib` in phase 3:
-
-```jsonc
-{
-  "schemaVersion": 1,           // format version
-  "name": "@v2-ds-example/lib", // package name
-  "version": "0.0.0",
-  "panda": "^1.0.0",            // compatible panda range
-  "preset": "../preset.ts",     // path to the preset (relative to dist/)
-  "importMap": {                // where the runtime lives
-    "css": "@v2-ds-example/styled-system/css",
-    "recipes": "@v2-ds-example/styled-system/recipes"
-  },
-  "buildinfo": "./panda.buildinfo.json"  // path to the shipped buildinfo
-}
-```
+panda resolves the manifest, wires the preset, and hydrates the buildinfo automatically.
 
 ## smart include
 
-`include` accepts bare package specifiers. when the resolved package has a `panda.lib.json`, the bare specifier is skipped from glob (the manifest is the source of truth via `designSystem`). when the package doesn't have a manifest, panda globs its published files automatically.
-
-example:
+`include` accepts bare package specifiers:
 
 ```ts
 include: [
   './src/**/*.{ts,tsx}',
-  '@v2-ds-example/lib',  // skipped — has panda.lib.json
-  '@acme/charts',        // would be globbed — assumes published `dist/` files
+  '@v2-ds-example/lib',     // skipped — has panda.lib.json (designSystem handles it)
+  '@v2-ds-example/charts',  // auto-globbed — no panda.lib.json, falls back to package.json#files
 ]
 ```
-
-## limitations
-
-- `panda lib` (phase 3) doesn't exist yet — the manifest is hand-written. in production you'd run `panda lib` as part of the lib's build step
-- `panda ship` needs to run before the consumer can use the buildinfo; there's no auto-watch for it
-- chain composition (lib A depends on lib B) is not shown here — see `sandbox/v2-ds-fixture/` for that
-- the `designSystem` config key is not yet in the public release; this sandbox tracks the v2 branch
