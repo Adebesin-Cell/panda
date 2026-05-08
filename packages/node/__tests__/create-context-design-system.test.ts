@@ -4,9 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { PandaContext } from '../src/create-context'
 
-// Cross-package fixture path: the `lib-manifest` fixtures live in
-// @pandacss/config's __tests__/fixtures/ (introduced in OSS-2355
-// phase 2 task 1, when readLibManifest moved from node to config).
+// Cross-package fixture path: lib-manifest fixtures live in @pandacss/config.
 // If those fixtures relocate, this path needs to follow.
 const fixturesRoot = join(__dirname, '../../config/__tests__/fixtures/lib-manifest')
 

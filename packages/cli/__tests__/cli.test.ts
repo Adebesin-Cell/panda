@@ -192,7 +192,7 @@ describe('CLI', () => {
   })
 
   test.skip('ship', async () => {
-    // Removed in OSS-2355 phase 3b — `panda ship` was folded into `panda lib`
+    // `panda ship` removed; folded into `panda lib`
     const cmd = `node ${binPath} ship --cwd="${testsCwd}"`
 
     // ship
@@ -205,7 +205,7 @@ describe('CLI', () => {
   })
 
   test.skip('emit-pkg', async () => {
-    // Removed in OSS-2355 phase 3b — `panda emit-pkg` was folded into `panda lib`
+    // `panda emit-pkg` removed; folded into `panda lib`
     const cmd = `node ${binPath} emit-pkg --cwd="${testsCwd}"`
 
     // emit-pkg
