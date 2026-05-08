@@ -30,12 +30,12 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   const pkgPath = join(cwd, 'package.json')
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
 
-  const presetSourceAbs = isAbsolute(presetSource) ? presetSource : join(cwd, outdir, presetSource)
+  const presetSourceAbs = resolvePresetSource(cwd, outdir, presetSource)
   const presetOutAbs = join(cwd, outdir, COMPILED_PRESET_FILENAME)
   const presetOutRelManifest = `./${COMPILED_PRESET_FILENAME}`
 
-  const presetCompiled = await compilePreset(presetSourceAbs, presetOutAbs)
-  const presetForManifest = presetCompiled ? presetOutRelManifest : presetSource
+  await compilePreset(presetSourceAbs, presetOutAbs)
+  const presetForManifest = presetOutRelManifest
 
   const libPresetName = findLibPresetName(ctx.config.presets)
   const presetExport = await detectPresetExport(cwd, outdir, presetForManifest, libPresetName)
@@ -53,18 +53,34 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   })
   logger.info('lib', `wrote ${manifestPath}`)
 
-  patchPackageExports(pkgPath, pkg, outdir, presetCompiled)
+  patchPackageExports(pkgPath, pkg, outdir)
 }
 
-async function compilePreset(sourceAbs: string, outAbs: string): Promise<boolean> {
-  if (!existsSync(sourceAbs)) {
-    logger.warn(
-      'lib',
-      `preset source not found at '${sourceAbs}' — manifest will reference it as-is and consumers must resolve it`,
-    )
-    return false
+/**
+ * Resolves the preset source path against either the manifest-relative
+ * default (`<outdir>/../preset.ts`) or a cwd-relative override. Throws if
+ * neither exists — `panda lib` cannot ship a working manifest without a
+ * resolvable preset, so failing loud here is better than silently producing
+ * a broken manifest that breaks consumers at install time.
+ */
+function resolvePresetSource(cwd: string, outdir: string, presetSource: string): string {
+  if (isAbsolute(presetSource)) {
+    if (!existsSync(presetSource)) {
+      throw new Error(`Preset source not found at '${presetSource}'.`)
+    }
+    return presetSource
   }
+  const manifestRel = join(cwd, outdir, presetSource)
+  if (existsSync(manifestRel)) return manifestRel
+  const cwdRel = join(cwd, presetSource)
+  if (existsSync(cwdRel)) return cwdRel
+  throw new Error(
+    `Preset source not found. Looked for '${presetSource}' relative to manifest dir ('${manifestRel}') ` +
+      `and cwd ('${cwdRel}'). 'panda lib' requires a preset file on disk.`,
+  )
+}
 
+async function compilePreset(sourceAbs: string, outAbs: string): Promise<void> {
   try {
     await esbuild({
       entryPoints: [sourceAbs],
@@ -77,13 +93,8 @@ async function compilePreset(sourceAbs: string, outAbs: string): Promise<boolean
       logLevel: 'silent',
     })
     logger.info('lib', `compiled preset → ${outAbs}`)
-    return true
   } catch (e) {
-    logger.warn(
-      'lib',
-      `failed to compile preset at '${sourceAbs}': ${String(e)}. manifest will reference the source file instead.`,
-    )
-    return false
+    throw new Error(`Failed to compile preset at '${sourceAbs}': ${String(e)}`, { cause: e })
   }
 }
 
@@ -182,16 +193,13 @@ function normalizeImportMap(importMap: unknown): Record<string, string> {
   return {}
 }
 
-function patchPackageExports(pkgPath: string, pkg: any, outdir: string, presetCompiled: boolean): void {
+function patchPackageExports(pkgPath: string, pkg: any, outdir: string): void {
   const exports = pkg.exports ?? {}
 
   const wanted: Record<string, string> = {
     './panda.lib.json': `./${outdir}/panda.lib.json`,
     './panda.buildinfo.json': `./${outdir}/panda.buildinfo.json`,
-  }
-
-  if (presetCompiled) {
-    wanted['./preset'] = `./${outdir}/${COMPILED_PRESET_FILENAME}`
+    './preset': `./${outdir}/${COMPILED_PRESET_FILENAME}`,
   }
 
   let changed = false

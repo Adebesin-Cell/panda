@@ -9,13 +9,7 @@ export interface ReadLibManifestResult {
   manifestPath: string
 }
 
-const cache = new Map<string, ReadLibManifestResult>()
-
 export function readLibManifest(packageName: string, cwd: string): ReadLibManifestResult {
-  const cacheKey = `${cwd}::${packageName}`
-  const cached = cache.get(cacheKey)
-  if (cached) return cached
-
   const require = createRequire(join(cwd, 'noop.js'))
 
   let manifestPath: string
@@ -40,9 +34,7 @@ export function readLibManifest(packageName: string, cwd: string): ReadLibManife
   }
 
   const manifest = validate(parsed, manifestPath)
-  const result = { manifest, manifestPath }
-  cache.set(cacheKey, result)
-  return result
+  return { manifest, manifestPath }
 }
 
 function validate(value: unknown, path: string): LibManifest {

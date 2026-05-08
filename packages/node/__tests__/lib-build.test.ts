@@ -47,6 +47,12 @@ beforeEach(() => {
     }),
   )
   writeFileSync(join(tmpRoot, 'src/index.ts'), FIXTURE_SRC)
+  // Default preset.ts so most tests get a happy-path resolve. Tests that
+  // exercise specific compile/missing-source behavior overwrite or delete it.
+  writeFileSync(
+    join(tmpRoot, 'preset.ts'),
+    `export const testPreset = { name: 'my-design-system', theme: { extend: { tokens: {} } } }`,
+  )
 })
 
 afterEach(() => {
@@ -168,18 +174,12 @@ export const myPreset = { name: 'my-design-system', theme }
     expect(pkg.exports['./preset']).toBe('./dist/preset.mjs')
   })
 
-  test('falls back gracefully when preset source is missing', async () => {
-    // No preset.ts written. compilePreset warns + returns false; manifest references the source path as-is.
+  test('throws when preset source is missing', async () => {
+    // Delete the default preset.ts seeded by beforeEach so the resolver fails.
+    rmSync(join(tmpRoot, 'preset.ts'))
     const ctx = makeCtx(tmpRoot, { presets: [{ name: 'my-design-system', theme: { tokens: {} } }] })
-    await buildLib(ctx, { outdir: 'dist' })
 
-    expect(existsSync(join(tmpRoot, 'dist', 'preset.mjs'))).toBe(false)
-
-    const manifest = JSON.parse(readFileSync(join(tmpRoot, 'dist', 'panda.lib.json'), 'utf-8'))
-    expect(manifest.preset).toBe('../preset.ts')
-
-    const pkg = JSON.parse(readFileSync(join(tmpRoot, 'package.json'), 'utf-8'))
-    expect(pkg.exports['./preset']).toBeUndefined()
+    await expect(buildLib(ctx, { outdir: 'dist' })).rejects.toThrow(/Preset source not found/)
   })
 
   test('preserves npm-package imports as external in compiled output', async () => {

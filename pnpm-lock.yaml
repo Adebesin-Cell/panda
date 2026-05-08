@@ -202,6 +202,8 @@ importers:
 
   packages/config/__tests__/fixtures/lib-manifest/broken-buildinfo-pkg: {}
 
+  packages/config/__tests__/fixtures/lib-manifest/forward-compat-pkg: {}
+
   packages/config/__tests__/fixtures/lib-manifest/incomplete-pkg: {}
 
   packages/config/__tests__/fixtures/lib-manifest/malformed-pkg: {}
@@ -1622,6 +1624,8 @@ importers:
       '@pandacss/dev':
         specifier: workspace:*
         version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress: {}
 
   sandbox/vite-ts:
     dependencies:
