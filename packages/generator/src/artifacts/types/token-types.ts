@@ -1,4 +1,4 @@
-import type { Context } from '@pandacss/core'
+import { createVisibilityFilter, type Context } from '@pandacss/core'
 import { capitalize, unionType } from '@pandacss/shared'
 import { outdent } from 'outdent'
 import pluralize from 'pluralize'
@@ -31,6 +31,7 @@ const categories = [
 
 export function generateTokenTypes(ctx: Context) {
   const { tokens } = ctx
+  const isHidden = createVisibilityFilter(ctx.config)
 
   const set = new Set<string>()
 
@@ -47,9 +48,12 @@ export function generateTokenTypes(ctx: Context) {
     }
 
     for (const [key, value] of tokens.view.categoryMap.entries()) {
+      const filteredKeys = Array.from(value.keys()).filter((tokenKey) => !isHidden('tokens', `${key}.${tokenKey}`))
+      if (filteredKeys.length === 0) continue
+
       const typeName = capitalize(pluralize.singular(key))
       const categoryName = `${typeName}Token`
-      set.add(`export type ${categoryName} = ${unionType(value.keys())}`)
+      set.add(`export type ${categoryName} = ${unionType(filteredKeys)}`)
       tokenSet.add(`${key}.$\{${categoryName}}`)
       result.add(`\t\t${key}: ${categoryName}`)
     }
