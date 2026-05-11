@@ -3,6 +3,9 @@ import type { Config, InternalVisibility, Preset } from '@pandacss/types'
 
 type VisibilityField = keyof InternalVisibility
 
+// Note: keyframes is wired through InternalVisibility for forward-compat but has no
+// type-side effect today (CssKeyframes is an open index signature).
+
 /**
  * Resolved config carrying the side-channel set of presets reached through
  * `config.designSystem`. Set by `getResolvedConfig` in @pandacss/config.

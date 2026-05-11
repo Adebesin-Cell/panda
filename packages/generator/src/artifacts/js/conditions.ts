@@ -1,8 +1,13 @@
-import type { Context } from '@pandacss/core'
+import { createVisibilityFilter, type Context } from '@pandacss/core'
 import outdent from 'outdent'
 
 export function generateConditions(ctx: Context) {
   const keys = Object.keys(ctx.conditions.values).concat('base')
+  const isHidden = createVisibilityFilter(ctx.config)
+  // NOTE: only the public `Conditions` interface is filtered. The runtime
+  // helpers (isCondition, finalizeConditions, sortConditions) must keep ALL
+  // keys so authored CSS using internal conditions still works.
+  const filteredKeys = keys.filter((key) => key === 'base' || !isHidden('conditions', key))
   return {
     js: outdent`
     ${ctx.file.import('withoutSpace', '../helpers')}
@@ -46,7 +51,7 @@ export function generateConditions(ctx: Context) {
     ${ctx.file.importType('AnySelector, Selectors', './selectors')}
 
     export interface Conditions {
-    ${keys
+    ${filteredKeys
       .map(
         (key) =>
           `\t${

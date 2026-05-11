@@ -44,6 +44,29 @@ describe('createVisibilityFilter', () => {
     expect(isHidden('tokens', 'colors.gray.500')).toBe(false)
   })
 
+  test('filters across all InternalVisibility fields', () => {
+    const ds = {
+      internal: {
+        tokens: ['colors.gray.*'],
+        semanticTokens: ['bg.surface.*'],
+        recipes: ['internalCard'],
+        patterns: ['internalStack'],
+        conditions: ['_legacyHover'],
+        keyframes: ['internalFade'],
+      },
+    } as any
+    const externals = new WeakSet<object>([ds])
+    const config = { presets: [ds] } as any
+    Object.defineProperty(config, '_externalPresets', { value: externals })
+    const isHidden = createVisibilityFilter(config)
+    expect(isHidden('tokens', 'colors.gray.500')).toBe(true)
+    expect(isHidden('semanticTokens', 'bg.surface.muted')).toBe(true)
+    expect(isHidden('recipes', 'internalCard')).toBe(true)
+    expect(isHidden('patterns', 'internalStack')).toBe(true)
+    expect(isHidden('conditions', '_legacyHover')).toBe(true)
+    expect(isHidden('keyframes', 'internalFade')).toBe(true)
+  })
+
   test('OR-merges internal blocks across multiple external presets', () => {
     const dsA = { internal: { tokens: ['colors.gray.*'] } } as any
     const dsB = { internal: { tokens: ['colors.red.*'] } } as any
