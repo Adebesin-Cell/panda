@@ -42,7 +42,35 @@ export function generateTokenTypes(ctx: Context) {
   if (tokens.isEmpty) {
     result.add('[token: string]: string')
   } else {
-    const colorPaletteKeys = Array.from(tokens.view.colorPalettes.keys())
+    // Drop a palette from the union only when EVERY real token belonging to it
+    // is hidden. We discover members by scanning the `colors` category for
+    // non-virtual tokens whose `extensions.colorPaletteRoots` (formatted via
+    // dot-join) includes the palette key — mirroring the same logic that
+    // `getTokensView` uses to populate `colorPalettes` in the first place.
+    const colorsCategory = tokens.view.categoryMap.get('colors' as any)
+    const tokenBelongsToPalette = (token: any, paletteKey: string): boolean => {
+      const ext = token?.extensions
+      if (!ext || ext.isVirtual) return false
+      const roots: string[][] | undefined = ext.colorPaletteRoots
+      if (!roots) return false
+      return roots.some((root) => root.join('.') === paletteKey)
+    }
+    const colorPaletteKeys = Array.from(tokens.view.colorPalettes.keys()).filter((paletteKey) => {
+      if (!colorsCategory) return true
+      let hasVisibleMember = false
+      let hasMember = false
+      for (const [tokenKey, token] of colorsCategory.entries()) {
+        if (!tokenBelongsToPalette(token, paletteKey)) continue
+        hasMember = true
+        const field = token.extensions?.isSemantic ? 'semanticTokens' : 'tokens'
+        if (!isHidden(field, `colors.${tokenKey}`)) {
+          hasVisibleMember = true
+          break
+        }
+      }
+      // If we found no members at all (defensive), keep the palette.
+      return hasMember ? hasVisibleMember : true
+    })
     if (colorPaletteKeys.length) {
       set.add(`export type ColorPalette = ${unionType(colorPaletteKeys)}`)
     }

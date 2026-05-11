@@ -75,45 +75,68 @@ test('[dts] filter that removes every token in a category drops the category', (
   expect(output).not.toMatch(/breakpoints: /)
 })
 
-test('[dts] semanticTokens field filters tokens with extensions.isSemantic', () => {
-  const preset: Preset = { internal: { semanticTokens: ['colors.gray.*'] } }
+test('[dts] semanticTokens field filters tokens whose extensions.isSemantic is true', () => {
+  // The fixture declares `colors.primary` under `theme.semanticTokens` — so the
+  // dictionary tags it with extensions.isSemantic === true via `processSemantic`.
+  // Verifying via the public API rather than mutating the token in place keeps
+  // this test honest about Task 8 / Gap 1.
+  const preset: Preset = { internal: { semanticTokens: ['colors.primary'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
 
-  // Mark a gray token as semantic so the per-token routing uses `semanticTokens`
-  const grayMap = ctx.tokens.view.categoryMap.get('colors' as any)
-  const grayToken = grayMap?.get('gray.500')
-  expect(grayToken).toBeDefined()
-  grayToken!.extensions.isSemantic = true
-
-  // And confirm a non-semantic gray token is NOT filtered through semanticTokens
-  const grayToken700 = grayMap?.get('gray.700')
-  expect(grayToken700).toBeDefined()
-  // gray.700 stays non-semantic
+  const colorsMap = ctx.tokens.view.categoryMap.get('colors' as any)
+  const primary = colorsMap?.get('primary')
+  expect(primary).toBeDefined()
+  // Gap 1: base-call inside processSemantic now tags isSemantic.
+  expect(primary!.extensions.isSemantic).toBe(true)
 
   const output = generateTokenTypes(ctx)
 
-  // gray.500 is routed to `semanticTokens` and matches `colors.gray.*` -> filtered
-  expect(output).not.toMatch(/"gray\.500"/)
-  // gray.700 is routed to `tokens` (no preset rule for tokens) -> kept
-  expect(output).toMatch(/"gray\.700"/)
+  // `colors.primary` is routed via `semanticTokens` and matches the rule -> filtered.
+  expect(output).not.toMatch(/"primary"/)
+  // A regular (non-semantic) gray token isn't routed through `semanticTokens`.
+  expect(output).toMatch(/"gray\.500"/)
 })
 
 test('[dts] `tokens` rule does NOT filter a token whose isSemantic is true', () => {
-  const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
+  // `colors.primary` is semantic via the fixture. A `tokens` rule that targets
+  // it must NOT filter it because it routes via `semanticTokens`.
+  const preset: Preset = { internal: { tokens: ['colors.primary', 'colors.gray.700'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
-
-  // Flip gray.500 to semantic — it should now bypass the `tokens` filter
-  const grayMap = ctx.tokens.view.categoryMap.get('colors' as any)
-  const grayToken = grayMap?.get('gray.500')
-  expect(grayToken).toBeDefined()
-  grayToken!.extensions.isSemantic = true
 
   const output = generateTokenTypes(ctx)
 
-  // gray.500 was rerouted to semanticTokens (no rule there) — kept
-  expect(output).toMatch(/"gray\.500"/)
-  // gray.700 still routed to tokens and matched — filtered
+  // `primary` is semantic — `tokens` rule does not apply -> kept.
+  expect(output).toMatch(/"primary"/)
+  // `gray.700` is a regular token — `tokens` rule applies -> filtered.
   expect(output).not.toMatch(/"gray\.700"/)
+})
+
+test('[dts] ColorPalette union drops palettes whose every token is hidden', () => {
+  // Hide every gray token via the `tokens` rule. The `gray` palette has no
+  // visible members left -> drop it from the ColorPalette union.
+  const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
+  const ctx = new PandaContext(buildConf(preset, { external: true }))
+  const output = generateTokenTypes(ctx)
+
+  // Extract the ColorPalette union (single line).
+  const match = output.match(/export type ColorPalette = ([^\n]+)/)
+  expect(match).not.toBeNull()
+  const union = match![1]
+  expect(union).not.toMatch(/['"`]gray['"`]/)
+  // Other palettes should remain.
+  expect(union).toMatch(/['"`]red['"`]/)
+})
+
+test('[dts] ColorPalette union keeps palettes with at least one visible token', () => {
+  // Hide only some gray tokens. The palette still has visible members -> keep.
+  const preset: Preset = { internal: { tokens: ['colors.gray.500'] } }
+  const ctx = new PandaContext(buildConf(preset, { external: true }))
+  const output = generateTokenTypes(ctx)
+
+  const match = output.match(/export type ColorPalette = ([^\n]+)/)
+  expect(match).not.toBeNull()
+  const union = match![1]
+  expect(union).toMatch(/['"`]gray['"`]/)
 })
 
 test('[dts] presets via `presets:[]` (not external) are NOT filtered', () => {
