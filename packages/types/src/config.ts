@@ -432,6 +432,30 @@ interface PresetOptions {
   presets?: (string | Preset | Promise<Preset>)[]
   /** Resolves a panda design-system library by package name (reads its `panda.lib.json`). */
   designSystem?: string
+  /**
+   * Marks specific preset entries as internal — usable by the lib's own code but stripped
+   * from the public type surface seen by consumers.
+   *
+   * Filter applies only to presets reached via `designSystem` (external). Presets reached
+   * via `presets:[]` (user-imported directly) are unaffected.
+   *
+   * Each value is a list of dot-paths with optional single-segment `*` wildcard.
+   * @example
+   * internal: {
+   *   tokens: ['colors.gray.*'],
+   *   recipes: ['internalBase.*'],
+   * }
+   */
+  internal?: InternalVisibility
+}
+
+export interface InternalVisibility {
+  tokens?: string[]
+  semanticTokens?: string[]
+  recipes?: string[]
+  patterns?: string[]
+  conditions?: string[]
+  keyframes?: string[]
 }
 
 export interface HooksOptions {
