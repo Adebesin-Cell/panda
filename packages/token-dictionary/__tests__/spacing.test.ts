@@ -108,6 +108,7 @@ test('with semantic spacing', () => {
             "@small": "0.5rem",
             "base": "{spacing.sm}",
           },
+          "isSemantic": true,
           "prop": "gutter",
           "rawValue": {
             "@small": "0.5rem",
@@ -156,6 +157,7 @@ test('with semantic spacing', () => {
             "base": "{spacing.sm}",
           },
           "isNegative": true,
+          "isSemantic": true,
           "originalPath": [
             "spacing",
             "gutter",
@@ -185,6 +187,7 @@ test('with semantic spacing', () => {
             "@small": "0.5rem",
             "base": "{spacing.sm}",
           },
+          "isSemantic": true,
           "prop": "gutter",
           "rawValue": {
             "@small": "0.5rem",
@@ -211,6 +214,7 @@ test('with semantic spacing', () => {
             "base": "{spacing.sm}",
           },
           "isNegative": true,
+          "isSemantic": true,
           "originalPath": [
             "spacing",
             "gutter",
@@ -281,6 +285,7 @@ test('with semantic spacing', () => {
             "base": "{spacing.sm}",
             "sm": "50px",
           },
+          "isSemantic": true,
           "prop": "nested",
           "rawValue": {
             "base": "{spacing.sm}",
@@ -329,6 +334,7 @@ test('with semantic spacing', () => {
             "sm": "50px",
           },
           "isNegative": true,
+          "isSemantic": true,
           "originalPath": [
             "spacing",
             "nested",
@@ -358,6 +364,7 @@ test('with semantic spacing', () => {
             "base": "{spacing.sm}",
             "sm": "50px",
           },
+          "isSemantic": true,
           "prop": "nested",
           "rawValue": {
             "base": "{spacing.sm}",
@@ -384,6 +391,7 @@ test('with semantic spacing', () => {
             "sm": "50px",
           },
           "isNegative": true,
+          "isSemantic": true,
           "originalPath": [
             "spacing",
             "nested",

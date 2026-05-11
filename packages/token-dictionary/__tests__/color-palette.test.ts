@@ -380,6 +380,7 @@ test('should generate nested object virtual palette', () => {
           "conditions": {
             "base": "navy",
           },
+          "isSemantic": true,
           "prop": "button.dark",
           "rawValue": {
             "base": "navy",
@@ -418,6 +419,7 @@ test('should generate nested object virtual palette', () => {
             "base": "skyblue",
           },
           "isDefault": true,
+          "isSemantic": true,
           "prop": "button.light",
           "rawValue": {
             "base": "skyblue",
@@ -464,6 +466,7 @@ test('should generate nested object virtual palette', () => {
             "base": "cyan",
           },
           "isDefault": true,
+          "isSemantic": true,
           "prop": "button.light.accent",
           "rawValue": {
             "base": "cyan",
@@ -520,6 +523,7 @@ test('should generate nested object virtual palette', () => {
           "conditions": {
             "base": "blue",
           },
+          "isSemantic": true,
           "prop": "button.light.accent.secondary",
           "rawValue": {
             "base": "blue",
@@ -1192,6 +1196,7 @@ test('should generate nested object virtual palette + custom formatTokenName', (
           "conditions": {
             "base": "navy",
           },
+          "isSemantic": true,
           "prop": "$button-dark",
           "rawValue": {
             "base": "navy",
@@ -1230,6 +1235,7 @@ test('should generate nested object virtual palette + custom formatTokenName', (
             "base": "skyblue",
           },
           "isDefault": true,
+          "isSemantic": true,
           "prop": "$button-light",
           "rawValue": {
             "base": "skyblue",
@@ -1276,6 +1282,7 @@ test('should generate nested object virtual palette + custom formatTokenName', (
             "base": "cyan",
           },
           "isDefault": true,
+          "isSemantic": true,
           "prop": "$button-light-accent",
           "rawValue": {
             "base": "cyan",
@@ -1332,6 +1339,7 @@ test('should generate nested object virtual palette + custom formatTokenName', (
           "conditions": {
             "base": "blue",
           },
+          "isSemantic": true,
           "prop": "$button-light-accent-secondary",
           "rawValue": {
             "base": "blue",

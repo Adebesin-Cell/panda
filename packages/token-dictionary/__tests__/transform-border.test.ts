@@ -181,6 +181,7 @@ test('transform / border', () => {
             "@hover": "var(--borders-md)",
             "base": "var(--borders-sm)",
           },
+          "isSemantic": true,
           "prop": "controlBorder",
           "rawValue": {
             "@hover": "{borders.md}",
@@ -207,6 +208,7 @@ test('transform / border', () => {
           "conditions": {
             "base": "var(--borders-control-border)",
           },
+          "isSemantic": true,
           "prop": "dividerBorder",
           "rawValue": {
             "base": "{borders.controlBorder}",
@@ -233,6 +235,7 @@ test('transform / border', () => {
             "@hover": "var(--borders-md)",
             "base": "var(--borders-sm)",
           },
+          "isSemantic": true,
           "prop": "controlBorder",
           "rawValue": {
             "@hover": "{borders.md}",

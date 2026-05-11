@@ -50,6 +50,7 @@ test('semantic tokens / deeply nested', () => {
               "highCon": "sdfdfsd",
             },
           },
+          "isSemantic": true,
           "prop": "pink",
           "rawValue": {
             "base": "#fff",
@@ -79,6 +80,7 @@ test('semantic tokens / deeply nested', () => {
               "highCon": "sdfdfsd",
             },
           },
+          "isSemantic": true,
           "prop": "pink",
           "rawValue": {
             "base": "#fff",
@@ -98,4 +100,25 @@ test('semantic tokens / deeply nested', () => {
       },
     ]
   `)
+})
+
+test('semantic tokens / base node carries extensions.isSemantic', () => {
+  // Gap 1 of Task 8: every token created via `processSemantic` (i.e. every
+  // entry under `theme.semanticTokens`) must be tagged with `isSemantic: true`
+  // so downstream filters (e.g. token-types.ts) can route via the
+  // `semanticTokens` field instead of `tokens`.
+  const dictionary = new TokenDictionary({
+    semanticTokens: {
+      colors: {
+        brand: { value: { base: '#fff', _dark: '#000' } },
+      },
+    },
+  })
+
+  dictionary.registerTokens()
+  dictionary.build()
+
+  const brand = dictionary.allTokens.find((t) => t.name === 'colors.brand')
+  expect(brand).toBeDefined()
+  expect(brand!.extensions.isSemantic).toBe(true)
 })

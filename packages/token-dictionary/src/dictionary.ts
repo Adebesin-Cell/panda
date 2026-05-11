@@ -162,6 +162,7 @@ export class TokenDictionary {
         conditions: value,
         rawValue: value,
         prop: this.formatTokenName(path.slice(1)),
+        isSemantic: true,
       })
 
       if (isDefault) {
@@ -195,12 +196,16 @@ export class TokenDictionary {
       const condName = '_theme' + capitalize(theme)
 
       // Treat theme.tokens as semanticTokens wrapped under the theme condition (e.g. _themeDark)
+      // but keep them classified as regular tokens for downstream consumers
+      // (themes spec, tokens.ts) — they originate from `themes[X].tokens`, not
+      // from `semanticTokens`. We override the `isSemantic` tag that
+      // `processSemantic` now sets unconditionally.
       walkObject(
         themeVariant.tokens ?? {},
         (token, path) => {
           const themeToken = { value: { [condName]: token.value } }
           const node = processSemantic(themeToken, path)
-          node.setExtensions({ theme, isVirtual: true })
+          node.setExtensions({ theme, isVirtual: true, isSemantic: false })
           this.registerToken(node)
         },
         { stop: isToken },
