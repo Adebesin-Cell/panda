@@ -86,6 +86,16 @@ export class Context {
 
   constructor(public conf: LoadConfigResult) {
     const config = defaults(conf.config)
+    // Preserve the WeakSet across defaults() spread — it's how the visibility filter looks up external presets.
+    const externalPresets = (conf.config as any)._externalPresets
+    if (externalPresets) {
+      Object.defineProperty(config, '_externalPresets', {
+        value: externalPresets,
+        enumerable: false,
+        writable: false,
+        configurable: false,
+      })
+    }
     const theme = config.theme ?? {}
     conf.config = config
 
