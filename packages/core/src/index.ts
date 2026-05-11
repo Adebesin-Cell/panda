@@ -19,4 +19,6 @@ export { StyleEncoder } from './style-encoder'
 export { Stylesheet } from './stylesheet'
 export type { CssOptions, ParserOptions, RecipeNode, StylesheetContext, TransformResult } from './types'
 export { Utility } from './utility'
+export { createVisibilityFilter } from './visibility'
+export type { VisibilityFilter } from './visibility'
 export { messages }
