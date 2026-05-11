@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "@panda-test/chain-lib",
+  "version": "1.0.0",
+  "panda": "^2.0.0",
+  "preset": "./preset.js",
+  "importMap": {
+    "css": "@panda-test/chain-lib/css",
+    "recipes": "@panda-test/chain-lib/recipes"
+  },
+  "buildinfo": "./panda.buildinfo.json"
+}
