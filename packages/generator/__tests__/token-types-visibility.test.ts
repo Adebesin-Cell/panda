@@ -43,7 +43,7 @@ function buildConf(externalPreset: Preset, options: { external: boolean }): Load
 }
 
 test('Context preserves _externalPresets across defaults() spread', () => {
-  const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
+  const preset: Preset = { name: 'test-preset', internal: { tokens: ['colors.gray.*'] } }
   const conf = buildConf(preset, { external: true })
   const expected = (conf.config as any)._externalPresets
 
@@ -54,7 +54,7 @@ test('Context preserves _externalPresets across defaults() spread', () => {
 })
 
 test('[dts] filter hides tokens matched by external preset internal.tokens', () => {
-  const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
+  const preset: Preset = { name: 'test-preset', internal: { tokens: ['colors.gray.*'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
   const output = generateTokenTypes(ctx)
 
@@ -67,7 +67,7 @@ test('[dts] filter hides tokens matched by external preset internal.tokens', () 
 })
 
 test('[dts] filter that removes every token in a category drops the category', () => {
-  const preset: Preset = { internal: { tokens: ['breakpoints.*'] } }
+  const preset: Preset = { name: 'test-preset', internal: { tokens: ['breakpoints.*'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
   const output = generateTokenTypes(ctx)
 
@@ -80,7 +80,7 @@ test('[dts] semanticTokens field filters tokens whose extensions.isSemantic is t
   // dictionary tags it with extensions.isSemantic === true via `processSemantic`.
   // Verifying via the public API rather than mutating the token in place keeps
   // this test honest about Task 8 / Gap 1.
-  const preset: Preset = { internal: { semanticTokens: ['colors.primary'] } }
+  const preset: Preset = { name: 'test-preset', internal: { semanticTokens: ['colors.primary'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
 
   const colorsMap = ctx.tokens.view.categoryMap.get('colors' as any)
@@ -100,7 +100,7 @@ test('[dts] semanticTokens field filters tokens whose extensions.isSemantic is t
 test('[dts] `tokens` rule does NOT filter a token whose isSemantic is true', () => {
   // `colors.primary` is semantic via the fixture. A `tokens` rule that targets
   // it must NOT filter it because it routes via `semanticTokens`.
-  const preset: Preset = { internal: { tokens: ['colors.primary', 'colors.gray.700'] } }
+  const preset: Preset = { name: 'test-preset', internal: { tokens: ['colors.primary', 'colors.gray.700'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
 
   const output = generateTokenTypes(ctx)
@@ -114,7 +114,7 @@ test('[dts] `tokens` rule does NOT filter a token whose isSemantic is true', () 
 test('[dts] ColorPalette union drops palettes whose every token is hidden', () => {
   // Hide every gray token via the `tokens` rule. The `gray` palette has no
   // visible members left -> drop it from the ColorPalette union.
-  const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
+  const preset: Preset = { name: 'test-preset', internal: { tokens: ['colors.gray.*'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
   const output = generateTokenTypes(ctx)
 
@@ -129,7 +129,7 @@ test('[dts] ColorPalette union drops palettes whose every token is hidden', () =
 
 test('[dts] ColorPalette union keeps palettes with at least one visible token', () => {
   // Hide only some gray tokens. The palette still has visible members -> keep.
-  const preset: Preset = { internal: { tokens: ['colors.gray.500'] } }
+  const preset: Preset = { name: 'test-preset', internal: { tokens: ['colors.gray.500'] } }
   const ctx = new PandaContext(buildConf(preset, { external: true }))
   const output = generateTokenTypes(ctx)
 
@@ -140,7 +140,7 @@ test('[dts] ColorPalette union keeps palettes with at least one visible token', 
 })
 
 test('[dts] presets via `presets:[]` (not external) are NOT filtered', () => {
-  const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
+  const preset: Preset = { name: 'test-preset', internal: { tokens: ['colors.gray.*'] } }
   const ctx = new PandaContext(buildConf(preset, { external: false }))
   const output = generateTokenTypes(ctx)
 
