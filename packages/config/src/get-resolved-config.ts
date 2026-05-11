@@ -20,6 +20,11 @@ const hookUtils = {
  * across rebuilds and would accumulate prepended designSystem presets otherwise.
  */
 export async function getResolvedConfig(config: ExtendableConfig, cwd: string, hooks?: Partial<PandaHooks>) {
+  // Tracks presets reached through `config.designSystem` (and their transitive
+  // `presets:` chain). The visibility filter applies `internal:` blocks only on
+  // these. Presets reached via `config.presets:[]` directly stay user-controlled.
+  const externalPresets = new WeakSet<object>()
+
   const root: ExtendableConfig = { ...config }
 
   if (root.designSystem) {
@@ -64,6 +69,9 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
 
       chainPresets.unshift(levelPreset)
       chainImportMaps.unshift(manifest.importMap)
+      if (typeof levelPreset === 'object' && levelPreset !== null) {
+        externalPresets.add(levelPreset as object)
+      }
       currentName = manifest.designSystem
       resolutionCwd = dirname(manifestPath)
     }
@@ -92,6 +100,8 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
   while (stack.length > 0) {
     const current = stack.pop()!
 
+    const currentIsExternal = typeof current === 'object' && current !== null && externalPresets.has(current as object)
+
     const subPresets = current.presets ?? []
     for (const subPreset of subPresets) {
       let presetConfig: ExtendableConfig
@@ -111,6 +121,10 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
       if (typeof presetConfig === 'object' && presetConfig !== null) {
         if (seenRefs.has(presetConfig)) continue
         seenRefs.add(presetConfig)
+      }
+
+      if (currentIsExternal && typeof presetConfig === 'object' && presetConfig !== null) {
+        externalPresets.add(presetConfig as object)
       }
 
       if (hooks?.['preset:resolved']) {
@@ -135,6 +149,13 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
 
   // Keep the resolved presets so we can find the origin of a token
   merged.presets = configs.slice(0, -1) as Preset[]
+
+  Object.defineProperty(merged, '_externalPresets', {
+    value: externalPresets,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  })
 
   return merged
 }
