@@ -48,7 +48,12 @@ export function generateTokenTypes(ctx: Context) {
     }
 
     for (const [key, value] of tokens.view.categoryMap.entries()) {
-      const filteredKeys = Array.from(value.keys()).filter((tokenKey) => !isHidden('tokens', `${key}.${tokenKey}`))
+      const filteredKeys: string[] = []
+      for (const [tokenKey, token] of value.entries()) {
+        const field = token.extensions?.isSemantic ? 'semanticTokens' : 'tokens'
+        if (isHidden(field, `${key}.${tokenKey}`)) continue
+        filteredKeys.push(tokenKey)
+      }
       if (filteredKeys.length === 0) continue
 
       const typeName = capitalize(pluralize.singular(key))

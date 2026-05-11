@@ -75,6 +75,47 @@ test('[dts] filter that removes every token in a category drops the category', (
   expect(output).not.toMatch(/breakpoints: /)
 })
 
+test('[dts] semanticTokens field filters tokens with extensions.isSemantic', () => {
+  const preset: Preset = { internal: { semanticTokens: ['colors.gray.*'] } }
+  const ctx = new PandaContext(buildConf(preset, { external: true }))
+
+  // Mark a gray token as semantic so the per-token routing uses `semanticTokens`
+  const grayMap = ctx.tokens.view.categoryMap.get('colors' as any)
+  const grayToken = grayMap?.get('gray.500')
+  expect(grayToken).toBeDefined()
+  grayToken!.extensions.isSemantic = true
+
+  // And confirm a non-semantic gray token is NOT filtered through semanticTokens
+  const grayToken700 = grayMap?.get('gray.700')
+  expect(grayToken700).toBeDefined()
+  // gray.700 stays non-semantic
+
+  const output = generateTokenTypes(ctx)
+
+  // gray.500 is routed to `semanticTokens` and matches `colors.gray.*` -> filtered
+  expect(output).not.toMatch(/"gray\.500"/)
+  // gray.700 is routed to `tokens` (no preset rule for tokens) -> kept
+  expect(output).toMatch(/"gray\.700"/)
+})
+
+test('[dts] `tokens` rule does NOT filter a token whose isSemantic is true', () => {
+  const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
+  const ctx = new PandaContext(buildConf(preset, { external: true }))
+
+  // Flip gray.500 to semantic — it should now bypass the `tokens` filter
+  const grayMap = ctx.tokens.view.categoryMap.get('colors' as any)
+  const grayToken = grayMap?.get('gray.500')
+  expect(grayToken).toBeDefined()
+  grayToken!.extensions.isSemantic = true
+
+  const output = generateTokenTypes(ctx)
+
+  // gray.500 was rerouted to semanticTokens (no rule there) — kept
+  expect(output).toMatch(/"gray\.500"/)
+  // gray.700 still routed to tokens and matched — filtered
+  expect(output).not.toMatch(/"gray\.700"/)
+})
+
 test('[dts] presets via `presets:[]` (not external) are NOT filtered', () => {
   const preset: Preset = { internal: { tokens: ['colors.gray.*'] } }
   const ctx = new PandaContext(buildConf(preset, { external: false }))

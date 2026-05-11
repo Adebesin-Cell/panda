@@ -1,4 +1,4 @@
-import type { Context } from '@pandacss/core'
+import { createVisibilityFilter, type Context } from '@pandacss/core'
 import type { AffectedArtifacts, Artifact, ArtifactFilters, ArtifactId } from '@pandacss/types'
 import outdent from 'outdent'
 import { generateConditions } from './js/conditions'
@@ -191,7 +191,10 @@ function setupCreateRecipe(ctx: Context): Artifact | undefined {
 function setupRecipesIndex(ctx: Context): Artifact | undefined {
   if (ctx.recipes.isEmpty()) return
 
-  const fileNames = ctx.recipes.details.map((recipe) => recipe.dashName)
+  const isHidden = createVisibilityFilter(ctx.config)
+  const fileNames = ctx.recipes.details
+    .filter((recipe) => !isHidden('recipes', recipe.baseName))
+    .map((recipe) => recipe.dashName)
   const index = {
     js: outdent.string(fileNames.map((file) => ctx.file.exportStar(`./${file}`)).join('\n')),
     dts: outdent.string(fileNames.map((file) => ctx.file.exportTypeStar(`./${file}`)).join('\n')),
@@ -226,7 +229,10 @@ function setupRecipes(ctx: Context, filters?: ArtifactFilters): Artifact | undef
 function setupPatternsIndex(ctx: Context): Artifact | undefined {
   if (ctx.isTemplateLiteralSyntax) return
 
-  const fileNames = ctx.patterns.details.map((pattern) => pattern.dashName)
+  const isHidden = createVisibilityFilter(ctx.config)
+  const fileNames = ctx.patterns.details
+    .filter((pattern) => !isHidden('patterns', pattern.baseName))
+    .map((pattern) => pattern.dashName)
   const index = {
     js: outdent.string(fileNames.map((file) => ctx.file.exportStar(`./${file}`)).join('\n')),
     dts: outdent.string(fileNames.map((file) => ctx.file.exportTypeStar(`./${file}`)).join('\n')),
@@ -342,7 +348,10 @@ function setupJsxPatternsIndex(ctx: Context): Artifact | undefined {
   if (!ctx.jsx.framework) return
 
   const isStyleProp = !ctx.isTemplateLiteralSyntax
-  const patternNames = ctx.patterns.details.map((pattern) => pattern.dashName)
+  const isHidden = createVisibilityFilter(ctx.config)
+  const patternNames = ctx.patterns.details
+    .filter((pattern) => !isHidden('patterns', pattern.baseName))
+    .map((pattern) => pattern.dashName)
   const styleContextExclude = ['qwik', 'svelte']
 
   const index = {
