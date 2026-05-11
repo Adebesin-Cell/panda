@@ -107,6 +107,7 @@ test('negative tokens', () => {
           "conditions": {
             "base": "{spacing.1}",
           },
+          "isSemantic": true,
           "prop": "lg",
           "rawValue": {
             "base": "{spacing.1}",
@@ -153,6 +154,7 @@ test('negative tokens', () => {
             "base": "{spacing.1}",
           },
           "isNegative": true,
+          "isSemantic": true,
           "originalPath": [
             "spacing",
             "lg",

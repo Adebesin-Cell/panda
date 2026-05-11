@@ -741,6 +741,7 @@ test('should work with default fixture', () => {
             "base": "var(--spacing-4)",
             "lg": "var(--spacing-5)",
           },
+          "isSemantic": true,
           "pixelValue": "var(--spacing-4)",
           "prop": "gutter",
           "rawValue": {
@@ -1610,6 +1611,7 @@ test('should work with default fixture', () => {
             "lg": "var(--spacing-5)",
           },
           "isNegative": true,
+          "isSemantic": true,
           "originalPath": [
             "spacing",
             "gutter",
@@ -1641,6 +1643,7 @@ test('should work with default fixture', () => {
             "base": "var(--spacing-4)",
             "lg": "var(--spacing-5)",
           },
+          "isSemantic": true,
           "pixelValue": "var(--spacing-5)",
           "prop": "gutter",
           "rawValue": {
@@ -1670,6 +1673,7 @@ test('should work with default fixture', () => {
             "lg": "var(--spacing-5)",
           },
           "isNegative": true,
+          "isSemantic": true,
           "originalPath": [
             "spacing",
             "gutter",

@@ -81,6 +81,7 @@ test('semantic tokens / nested', () => {
           "conditions": {
             "base": "#fff",
           },
+          "isSemantic": true,
           "prop": "grabbed",
           "rawValue": {
             "base": "#fff",
@@ -105,6 +106,7 @@ test('semantic tokens / nested', () => {
             "@dark": "#222",
             "@light": "#333",
           },
+          "isSemantic": true,
           "prop": "disabled",
           "rawValue": {
             "@dark": "#222",
@@ -129,6 +131,7 @@ test('semantic tokens / nested', () => {
           "conditions": {
             "base": "red",
           },
+          "isSemantic": true,
           "prop": "button.primary",
           "rawValue": {
             "base": "red",
@@ -154,6 +157,7 @@ test('semantic tokens / nested', () => {
             "@dark": "#222",
             "@light": "#333",
           },
+          "isSemantic": true,
           "prop": "disabled",
           "rawValue": {
             "@dark": "#222",
@@ -179,6 +183,7 @@ test('semantic tokens / nested', () => {
             "@dark": "#222",
             "@light": "#333",
           },
+          "isSemantic": true,
           "prop": "disabled",
           "rawValue": {
             "@dark": "#222",
