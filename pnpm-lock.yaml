@@ -1667,6 +1667,16 @@ importers:
         specifier: workspace:*
         version: link:../../../../packages/cli
 
+  sandbox/v2-ds-stress/packages/chain-3-alt:
+    dependencies:
+      '@v2-ds-stress/chain-2':
+        specifier: workspace:*
+        version: link:../chain-2
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
   sandbox/v2-ds-stress/packages/chain-4:
     dependencies:
       '@v2-ds-stress/chain-3':
