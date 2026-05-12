@@ -8,8 +8,7 @@
     "css": "panda"
   },
   "dependencies": {
-    "@v2-ds-fixture/lib-leaf": "workspace:*",
-    "@v2-ds-fixture/styled-system": "workspace:*"
+    "@v2-ds-fixture/lib-leaf": "workspace:*"
   },
   "devDependencies": {
     "@pandacss/dev": "workspace:*"

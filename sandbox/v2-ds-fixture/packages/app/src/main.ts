@@ -1,4 +1,4 @@
-import { css } from '@v2-ds-fixture/styled-system/css'
+import { css } from './styled-system/css'
 import { panelClass, leafHero } from '@v2-ds-fixture/lib-leaf'
 
 const appOnly = css({
