@@ -6,6 +6,5 @@ export default defineConfig({
   presets: ['@pandacss/dev/presets', acmePreset],
   include: ['./src/**/*.{ts,tsx}'],
   exclude: [],
-  importMap: '@v2-ds-fixture/styled-system',
-  outdir: '@v2-ds-fixture/styled-system',
+  outdir: './styled-system',
 })

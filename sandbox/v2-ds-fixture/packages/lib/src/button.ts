@@ -1,5 +1,5 @@
-import { css } from '@v2-ds-fixture/styled-system/css'
-import { button } from '@v2-ds-fixture/styled-system/recipes'
+import { css } from '../styled-system/css'
+import { button } from '../styled-system/recipes'
 
 export const buttonStyles = (visual: 'solid' | 'outline' = 'solid') => button({ visual })
 

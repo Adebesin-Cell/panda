@@ -18,10 +18,7 @@
     "css:gen": "panda codegen",
     "lib": "panda lib"
   },
-  "dependencies": {
-    "@v2-ds-fixture/styled-system": "workspace:*"
-  },
-  "devDependencies": {
+"devDependencies": {
     "@pandacss/dev": "workspace:*"
   }
 }
