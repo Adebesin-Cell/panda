@@ -1,9 +1,7 @@
 import { definePreset } from '@pandacss/dev'
-import { midPreset } from '@v2-ds-fixture/lib-mid/preset'
 
 export const leafPreset = definePreset({
   name: '@v2-ds-fixture/lib-leaf/preset',
-  presets: [midPreset],
   theme: {
     extend: {
       tokens: {
