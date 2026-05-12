@@ -1,5 +1,5 @@
-import { css } from '@v2-ds-fixture/styled-system/css'
-import { panel } from '@v2-ds-fixture/styled-system/recipes'
+import { css } from '../styled-system/css'
+import { panel } from '../styled-system/recipes'
 
 export const panelClass = panel()
 

@@ -19,8 +19,7 @@
     "lib": "panda lib"
   },
   "dependencies": {
-    "@v2-ds-fixture/lib-mid": "workspace:*",
-    "@v2-ds-fixture/styled-system": "workspace:*"
+    "@v2-ds-fixture/lib-mid": "workspace:*"
   },
   "devDependencies": {
     "@pandacss/dev": "workspace:*"
