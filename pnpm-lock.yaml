@@ -1575,19 +1575,12 @@ importers:
       '@v2-ds-fixture/lib-leaf':
         specifier: workspace:*
         version: link:../lib-leaf
-      '@v2-ds-fixture/styled-system':
-        specifier: workspace:*
-        version: link:../styled-system
     devDependencies:
       '@pandacss/dev':
         specifier: workspace:*
         version: link:../../../../packages/cli
 
   sandbox/v2-ds-fixture/packages/lib:
-    dependencies:
-      '@v2-ds-fixture/styled-system':
-        specifier: workspace:*
-        version: link:../styled-system
     devDependencies:
       '@pandacss/dev':
         specifier: workspace:*
@@ -1598,9 +1591,6 @@ importers:
       '@v2-ds-fixture/lib-mid':
         specifier: workspace:*
         version: link:../lib-mid
-      '@v2-ds-fixture/styled-system':
-        specifier: workspace:*
-        version: link:../styled-system
     devDependencies:
       '@pandacss/dev':
         specifier: workspace:*
@@ -1611,21 +1601,10 @@ importers:
       '@v2-ds-fixture/lib':
         specifier: workspace:*
         version: link:../lib
-      '@v2-ds-fixture/styled-system':
-        specifier: workspace:*
-        version: link:../styled-system
     devDependencies:
       '@pandacss/dev':
         specifier: workspace:*
         version: link:../../../../packages/cli
-
-  sandbox/v2-ds-fixture/packages/styled-system:
-    devDependencies:
-      '@pandacss/dev':
-        specifier: workspace:*
-        version: link:../../../../packages/cli
-
-  sandbox/v2-ds-stress: {}
 
   sandbox/vite-ts:
     dependencies:
