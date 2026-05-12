@@ -31,6 +31,10 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
     const chainImportMaps: LibManifest['importMap'][] = []
     const visited = new Set<string>()
     let currentName: string | undefined = root.designSystem
+    // Each level's manifest is resolved relative to the PREVIOUS manifest's dir,
+    // not the initial consumer cwd — so transitive parents (chain-N → chain-(N-1)
+    // → chain-(N-2)) resolve even when the consumer only depends on chain-N.
+    let resolutionCwd = cwd
 
     while (currentName) {
       if (visited.has(currentName)) {
@@ -38,7 +42,7 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
       }
       visited.add(currentName)
 
-      const { manifest, manifestPath } = readLibManifest(currentName, cwd)
+      const { manifest, manifestPath } = readLibManifest(currentName, resolutionCwd)
 
       const presetPath = isAbsolute(manifest.preset) ? manifest.preset : join(dirname(manifestPath), manifest.preset)
       const presetModule = await bundle(presetPath, cwd)
@@ -61,6 +65,7 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
       chainPresets.unshift(levelPreset)
       chainImportMaps.unshift(manifest.importMap)
       currentName = manifest.designSystem
+      resolutionCwd = dirname(manifestPath)
     }
 
     // Prepend the full chain (parents first) ahead of any user-declared presets.

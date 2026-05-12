@@ -1606,6 +1606,97 @@ importers:
         specifier: workspace:*
         version: link:../../../../packages/cli
 
+  sandbox/v2-ds-stress: {}
+
+  sandbox/v2-ds-stress/packages/app:
+    dependencies:
+      '@v2-ds-stress/atlas-lib':
+        specifier: workspace:*
+        version: link:../atlas-lib
+      '@v2-ds-stress/chain-6':
+        specifier: workspace:*
+        version: link:../chain-6
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/atlas-lib:
+    dependencies:
+      '@pandacss/preset-atlaskit':
+        specifier: workspace:*
+        version: link:../../../../packages/preset-atlaskit
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/chain-0:
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/chain-1:
+    dependencies:
+      '@v2-ds-stress/chain-0':
+        specifier: workspace:*
+        version: link:../chain-0
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/chain-2:
+    dependencies:
+      '@v2-ds-stress/chain-1':
+        specifier: workspace:*
+        version: link:../chain-1
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/chain-3:
+    dependencies:
+      '@v2-ds-stress/chain-2':
+        specifier: workspace:*
+        version: link:../chain-2
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/chain-4:
+    dependencies:
+      '@v2-ds-stress/chain-3':
+        specifier: workspace:*
+        version: link:../chain-3
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/chain-5:
+    dependencies:
+      '@v2-ds-stress/chain-4':
+        specifier: workspace:*
+        version: link:../chain-4
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
+  sandbox/v2-ds-stress/packages/chain-6:
+    dependencies:
+      '@v2-ds-stress/chain-5':
+        specifier: workspace:*
+        version: link:../chain-5
+    devDependencies:
+      '@pandacss/dev':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+
   sandbox/vite-ts:
     dependencies:
       react:

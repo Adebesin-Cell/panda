@@ -4,5 +4,6 @@ packages:
   - 'sandbox/component-lib/**'
   - 'sandbox/v2-ds-fixture/**'
   - 'sandbox/v2-ds-example/**'
+  - 'sandbox/v2-ds-stress/**'
   - 'playground'
   - 'website'

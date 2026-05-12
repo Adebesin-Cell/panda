@@ -1,0 +1,26 @@
+{
+  "name": "@v2-ds-stress/chain-1",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "src",
+    "dist",
+    "preset.ts"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./preset": "./dist/preset.mjs",
+    "./panda.lib.json": "./dist/panda.lib.json",
+    "./panda.buildinfo.json": "./dist/panda.buildinfo.json"
+  },
+  "scripts": {
+    "lib": "panda lib"
+  },
+  "dependencies": {
+    "@v2-ds-stress/chain-0": "workspace:*"
+  },
+  "devDependencies": {
+    "@pandacss/dev": "workspace:*"
+  }
+}
