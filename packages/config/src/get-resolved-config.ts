@@ -1,5 +1,5 @@
 import { omit, pick, traverse } from '@pandacss/shared'
-import type { Config, LoadConfigResult, PandaHooks, Preset } from '@pandacss/types'
+import type { Config, LibManifest, LoadConfigResult, PandaHooks, Preset } from '@pandacss/types'
 import { dirname, isAbsolute, join } from 'node:path'
 import { bundle } from './bundle-config'
 import { readLibManifest } from './lib-manifest'
@@ -23,35 +23,56 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
   const root: ExtendableConfig = { ...config }
 
   if (root.designSystem) {
-    const { manifest, manifestPath } = readLibManifest(root.designSystem, cwd)
+    // Walk the designSystem chain via each lib's manifest. Each manifest may declare
+    // its own `designSystem` (set when that lib was built); the chain stops at the lib
+    // that has no parent. We collect parents first → child last so the merge order
+    // matches user expectation (parent tokens get overridden by child tokens).
+    const chainPresets: Preset[] = []
+    const chainImportMaps: LibManifest['importMap'][] = []
+    const visited = new Set<string>()
+    let currentName: string | undefined = root.designSystem
 
-    const presetPath = isAbsolute(manifest.preset) ? manifest.preset : join(dirname(manifestPath), manifest.preset)
-    const presetModule = await bundle(presetPath, cwd)
-    const exportName = manifest.presetExport ?? 'default'
+    while (currentName) {
+      if (visited.has(currentName)) {
+        throw new Error(`designSystem chain has a cycle through '${currentName}'.`)
+      }
+      visited.add(currentName)
 
-    const moduleObj = (presetModule.config ?? presetModule) as Record<string, unknown>
-    let designSystemPreset = moduleObj[exportName] as Preset | undefined
+      const { manifest, manifestPath } = readLibManifest(currentName, cwd)
 
-    if (!designSystemPreset && exportName === 'default') {
-      designSystemPreset = moduleObj as unknown as Preset
+      const presetPath = isAbsolute(manifest.preset) ? manifest.preset : join(dirname(manifestPath), manifest.preset)
+      const presetModule = await bundle(presetPath, cwd)
+      const exportName = manifest.presetExport ?? 'default'
+
+      const moduleObj = (presetModule.config ?? presetModule) as Record<string, unknown>
+      let levelPreset = moduleObj[exportName] as Preset | undefined
+
+      if (!levelPreset && exportName === 'default') {
+        levelPreset = moduleObj as unknown as Preset
+      }
+
+      if (!levelPreset) {
+        throw new Error(
+          `designSystem '${currentName}': preset file does not export '${exportName}'. ` +
+            `Check the manifest's 'presetExport' field or that the preset file has a default export.`,
+        )
+      }
+
+      chainPresets.unshift(levelPreset)
+      chainImportMaps.unshift(manifest.importMap)
+      currentName = manifest.designSystem
     }
 
-    if (!designSystemPreset) {
-      throw new Error(
-        `designSystem '${root.designSystem}': preset file does not export '${exportName}'. ` +
-          `Check the manifest's 'presetExport' field or that the preset file has a default export.`,
-      )
-    }
-
-    root.presets = [designSystemPreset, ...(root.presets ?? [])]
+    // Prepend the full chain (parents first) ahead of any user-declared presets.
+    root.presets = [...chainPresets, ...(root.presets ?? [])]
 
     const consumerImportMap = root.importMap
     if (consumerImportMap === undefined) {
-      root.importMap = manifest.importMap
+      root.importMap = chainImportMaps.length === 1 ? chainImportMaps[0] : chainImportMaps
     } else if (Array.isArray(consumerImportMap)) {
-      root.importMap = [...consumerImportMap, manifest.importMap]
+      root.importMap = [...consumerImportMap, ...chainImportMaps]
     } else {
-      root.importMap = [consumerImportMap, manifest.importMap]
+      root.importMap = [consumerImportMap, ...chainImportMaps]
     }
   }
 

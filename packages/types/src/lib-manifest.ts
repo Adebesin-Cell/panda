@@ -21,4 +21,10 @@ export interface LibManifest {
   buildinfo: string
   /** Optional fallback re-extract globs (relative to package root) when buildinfo can't hydrate. */
   files?: string[]
+  /**
+   * Parent design system this lib was built against. When set, consumers walk this chain
+   * transitively via each parent's own manifest — so an intermediate lib's `preset.ts` can
+   * declare only its own additions without importing the parent preset from `node_modules`.
+   */
+  designSystem?: string
 }

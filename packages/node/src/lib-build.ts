@@ -50,6 +50,7 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
     pandaVersion: options.pandaVersion,
     pkg,
     presetExport,
+    designSystem: ctx.config.designSystem,
   })
   logger.info('lib', `wrote ${manifestPath}`)
 

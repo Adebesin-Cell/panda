@@ -21,6 +21,8 @@ export interface WriteLibManifestOptions {
   }
   /** Name of the preset's export. Defaults to 'default' downstream when omitted. */
   presetExport?: string
+  /** Parent design system this lib was built against. Carried in the manifest so consumers walk the chain transitively. */
+  designSystem?: string
 }
 
 export interface WriteLibManifestResult {
@@ -65,6 +67,7 @@ export function writeLibManifest(options: WriteLibManifestOptions): WriteLibMani
     importMap,
     buildinfo,
     ...(files && files.length > 0 ? { files } : {}),
+    ...(options.designSystem ? { designSystem: options.designSystem } : {}),
   }
 
   const manifestDir = join(cwd, outdir)
