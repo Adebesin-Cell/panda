@@ -136,6 +136,27 @@ This approach comes with a few downsides:
 
 ## Use Panda as external package
 
+> **v2 design system support.** Panda now offers first-class design system
+> packaging via `panda lib` and the [`designSystem`](/docs/references/config#designsystem)
+> config field. A lib author runs a single command:
+>
+> ```bash
+> pnpm panda lib
+> ```
+>
+> …and a consumer wires the whole thing up with one config field:
+>
+> ```ts
+> defineConfig({ designSystem: '@acme-org/design-system', include: ['./src/**/*.{ts,tsx}'] })
+> ```
+>
+> Smart-include also resolves bare specifiers in `include` against Node module
+> resolution, so the legacy `./node_modules/.../panda.buildinfo.json` entry is
+> no longer required. The legacy `panda ship` and `panda emit-pkg` commands
+> have been removed; their functionality is now part of [`panda lib`](/docs/references/cli#lib).
+> The walkthrough below documents the older multi-step flow for context and
+> migration reference.
+
 ### Summary
 
 - create a Panda [preset](/docs/customization/presets) so that you (and your users) can share the same design system

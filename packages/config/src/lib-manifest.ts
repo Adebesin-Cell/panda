@@ -10,7 +10,10 @@ export interface ReadLibManifestResult {
 }
 
 export function readLibManifest(packageName: string, cwd: string): ReadLibManifestResult {
-  const require = createRequire(join(cwd, 'noop.js'))
+  // `createRequire` anchors resolution on the directory of the given path; the
+  // file itself doesn't need to exist. Use `package.json` rather than a
+  // fictitious `noop.js` so the anchor is an honest, conventional location.
+  const require = createRequire(join(cwd, 'package.json'))
 
   let manifestPath: string
   try {

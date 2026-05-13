@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { logger } from '@pandacss/logger'
 import type { LibManifest } from '@pandacss/types'
 
 export interface WriteLibManifestOptions {
@@ -88,6 +89,15 @@ function normalizePandaRange(declared: string, cwd: string, providedVersion?: st
         return `^${major}.0.0`
       }
     }
+    // No declared range and no installed copy to infer from. The manifest will
+    // claim compatibility with any panda version — surface this so the lib
+    // author can pin a real range before publishing.
+    logger.warn(
+      'lib',
+      `Could not determine the @pandacss/dev version to record in the manifest. ` +
+        `Writing 'panda: "*"' — consumers on any panda version will be considered compatible. ` +
+        `Declare '@pandacss/dev' in devDependencies (or peerDependencies) with a real range to fix.`,
+    )
     return '*'
   }
   return declared

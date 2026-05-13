@@ -1,5 +1,6 @@
 import { omit, pick, traverse } from '@pandacss/shared'
 import type { Config, LibManifest, LoadConfigResult, PandaHooks, Preset } from '@pandacss/types'
+import { realpathSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
 import { bundle } from './bundle-config'
 import { readLibManifest } from './lib-manifest'
@@ -29,6 +30,9 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
     // matches user expectation (parent tokens get overridden by child tokens).
     const chainPresets: Preset[] = []
     const chainImportMaps: LibManifest['importMap'][] = []
+    // Track realpaths of visited manifests, not specifier strings — under pnpm
+    // a single manifest can be reached via multiple aliases (e.g. `@scope/lib`
+    // and `lib`); a string-keyed visited set would miss those cycles.
     const visited = new Set<string>()
     let currentName: string | undefined = root.designSystem
     // Each level's manifest is resolved relative to the PREVIOUS manifest's dir,
@@ -37,15 +41,26 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
     let resolutionCwd = cwd
 
     while (currentName) {
-      if (visited.has(currentName)) {
-        throw new Error(`designSystem chain has a cycle through '${currentName}'.`)
-      }
-      visited.add(currentName)
-
       const { manifest, manifestPath } = readLibManifest(currentName, resolutionCwd)
 
+      let manifestKey: string
+      try {
+        manifestKey = realpathSync(manifestPath)
+      } catch {
+        manifestKey = manifestPath
+      }
+      if (visited.has(manifestKey)) {
+        throw new Error(
+          `designSystem chain has a cycle through '${currentName}' (resolved to '${manifestKey}').`,
+        )
+      }
+      visited.add(manifestKey)
+
       const presetPath = isAbsolute(manifest.preset) ? manifest.preset : join(dirname(manifestPath), manifest.preset)
-      const presetModule = await bundle(presetPath, cwd)
+      // Resolve the parent preset's externals against THIS lib's directory, not
+      // the initial consumer cwd — under pnpm, chain-(N-1) may not be hoisted to
+      // the consumer's node_modules but is always present in chain-N's.
+      const presetModule = await bundle(presetPath, dirname(manifestPath))
       const exportName = manifest.presetExport ?? 'default'
 
       const moduleObj = (presetModule.config ?? presetModule) as Record<string, unknown>
@@ -73,7 +88,8 @@ export async function getResolvedConfig(config: ExtendableConfig, cwd: string, h
 
     const consumerImportMap = root.importMap
     if (consumerImportMap === undefined) {
-      root.importMap = chainImportMaps.length === 1 ? chainImportMaps[0] : chainImportMaps
+      // Always return an array so downstream code never branches on shape.
+      root.importMap = chainImportMaps
     } else if (Array.isArray(consumerImportMap)) {
       root.importMap = [...consumerImportMap, ...chainImportMaps]
     } else {

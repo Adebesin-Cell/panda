@@ -191,32 +191,4 @@ describe('CLI', () => {
     expect(debugConfigExists).toBeUndefined()
   })
 
-  test.skip('ship', async () => {
-    // `panda ship` removed; folded into `panda lib`
-    const cmd = `node ${binPath} ship --cwd="${testsCwd}"`
-
-    // ship
-    const output = runCommand(cmd, { cwd: testsCwd })
-    expect(output.includes('files using Panda')).toBe(true)
-
-    // Check that the `styled-system/panda.buildinfo.json` file was created
-    const buildInfoExists = await fs.access(path.resolve(paths.styledSystem, 'panda.buildinfo.json'))
-    expect(buildInfoExists).toBeUndefined()
-  })
-
-  test.skip('emit-pkg', async () => {
-    // `panda emit-pkg` removed; folded into `panda lib`
-    const cmd = `node ${binPath} emit-pkg --cwd="${testsCwd}"`
-
-    // emit-pkg
-    const output = runCommand(cmd, { cwd: testsCwd })
-    expect(output.includes('Emit package.json')).toBe(true)
-
-    // Check that the `package.json` file was created
-    const pkgExists = await fs.access(paths.pkgJson)
-    expect(pkgExists).toBeUndefined()
-
-    // Clean up
-    await fs.unlink(paths.pkgJson)
-  })
 })

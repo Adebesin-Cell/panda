@@ -28,7 +28,12 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   await buildInfo(ctx, buildinfoOutfile)
 
   const pkgPath = join(cwd, 'package.json')
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+  let pkg: any
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+  } catch (error) {
+    throw new Error(`Cannot read package.json at '${pkgPath}'.`, { cause: error })
+  }
 
   const presetSourceAbs = resolvePresetSource(cwd, outdir, presetSource)
   const presetOutAbs = join(cwd, outdir, COMPILED_PRESET_FILENAME)
@@ -37,8 +42,7 @@ export async function buildLib(ctx: PandaContext, options: BuildLibOptions = {})
   await compilePreset(presetSourceAbs, presetOutAbs)
   const presetForManifest = presetOutRelManifest
 
-  const libPresetName = findLibPresetName(ctx.config.presets)
-  const presetExport = await detectPresetExport(cwd, outdir, presetForManifest, libPresetName)
+  const presetExport = await detectPresetExport(cwd, outdir, presetForManifest)
 
   const importMap = normalizeImportMap(ctx.config.importMap)
   const { manifestPath } = writeLibManifest({
@@ -99,29 +103,25 @@ async function compilePreset(sourceAbs: string, outAbs: string): Promise<void> {
   }
 }
 
-function findLibPresetName(presets: unknown[] | undefined): string | undefined {
-  if (!Array.isArray(presets)) return undefined
+const BUILTIN_PRESET_NAMES = new Set(['@pandacss/preset-base', '@pandacss/preset-panda'])
 
-  const builtinNames = new Set(['@pandacss/preset-base', '@pandacss/preset-panda'])
-
-  for (let i = presets.length - 1; i >= 0; i--) {
-    const p = presets[i]
-    if (!p || typeof p !== 'object') continue
-    const name = (p as { name?: unknown }).name
-    if (typeof name === 'string' && !builtinNames.has(name)) return name
-  }
-
-  return undefined
+function isLibPreset(value: unknown): value is { name: string } {
+  if (!value || typeof value !== 'object') return false
+  const name = (value as { name?: unknown }).name
+  return typeof name === 'string' && !BUILTIN_PRESET_NAMES.has(name)
 }
 
+// Detect which named export of the compiled preset is the lib's preset by
+// inspecting the bundled module itself. The earlier heuristic walked
+// `ctx.config.presets` and returned the last non-builtin entry's `name`, but
+// that picks the wrong preset when a lib composes multiple non-builtin presets
+// (e.g. [colorPreset, typographyPreset]) and only one is the "main" export.
+// Reading the source file directly is the source of truth.
 async function detectPresetExport(
   cwd: string,
   outdir: string,
   presetPathRelativeToManifest: string,
-  libPresetName: string | undefined,
 ): Promise<string | undefined> {
-  if (!libPresetName) return undefined
-
   let resolved: string | undefined
   if (isAbsolute(presetPathRelativeToManifest)) {
     resolved = existsSync(presetPathRelativeToManifest) ? presetPathRelativeToManifest : undefined
@@ -155,13 +155,12 @@ async function detectPresetExport(
   if (!candidate || typeof candidate !== 'object') return undefined
 
   const candidateRecord = candidate as Record<string, unknown>
-  if ((candidateRecord.name as string | undefined) === libPresetName) return 'default'
+
+  if (isLibPreset(candidateRecord)) return 'default'
 
   for (const [key, value] of Object.entries(candidateRecord)) {
     if (key === 'default') continue
-    if (value && typeof value === 'object' && (value as { name?: string }).name === libPresetName) {
-      return key
-    }
+    if (isLibPreset(value)) return key
   }
 
   return undefined
@@ -195,7 +194,24 @@ function normalizeImportMap(importMap: unknown): Record<string, string> {
 }
 
 function patchPackageExports(pkgPath: string, pkg: any, outdir: string): void {
-  const exports = pkg.exports ?? {}
+  // The package.json `exports` spec accepts three forms:
+  //   - string  (sugar for `{ ".": "<string>" }`)
+  //   - array   (conditional fallback list, also sugar for the `.` entry)
+  //   - object  (the standard subpath form)
+  // We must normalize to the object form before assignment — otherwise
+  // `exports[key] = value` either attaches to a String wrapper (silently lost
+  // on JSON.stringify) or mutates an array index.
+  const existing = pkg.exports
+  let exports: Record<string, any>
+  let normalized = false
+  if (typeof existing === 'string' || Array.isArray(existing)) {
+    exports = { '.': existing }
+    normalized = true
+  } else if (existing && typeof existing === 'object') {
+    exports = existing as Record<string, any>
+  } else {
+    exports = {}
+  }
 
   const wanted: Record<string, string> = {
     './panda.lib.json': `./${outdir}/panda.lib.json`,
@@ -203,7 +219,7 @@ function patchPackageExports(pkgPath: string, pkg: any, outdir: string): void {
     './preset': `./${outdir}/${COMPILED_PRESET_FILENAME}`,
   }
 
-  let changed = false
+  let changed = normalized
   for (const [key, value] of Object.entries(wanted)) {
     if (exports[key] !== value) {
       exports[key] = value

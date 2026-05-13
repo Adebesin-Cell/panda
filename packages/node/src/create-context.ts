@@ -77,9 +77,14 @@ export class PandaContext extends Generator {
     try {
       buildinfoRaw = readFileSync(buildinfoPath, 'utf-8')
     } catch {
-      logger.warn(
+      // The manifest declared this buildinfo path, so a missing file means the
+      // lib was shipped incomplete. Failing loudly avoids silently emitting CSS
+      // that's missing the lib's pre-extracted classes.
+      logger.error(
         'designSystem',
-        `Could not read buildinfo at '${buildinfoPath}' for '${packageName}'. The library's buildinfo will not be hydrated.`,
+        `Manifest for '${packageName}' declares buildinfo at '${buildinfoPath}' but the file is missing. ` +
+          `The lib's pre-extracted classes will NOT be hydrated and consumer CSS will be incomplete. ` +
+          `Run 'panda lib' in the design system package to regenerate the buildinfo.`,
       )
       return
     }
@@ -88,7 +93,10 @@ export class PandaContext extends Generator {
     try {
       parsed = JSON.parse(buildinfoRaw)
     } catch {
-      logger.warn('designSystem', `Buildinfo at '${buildinfoPath}' is not valid JSON. Skipping hydration.`)
+      logger.error(
+        'designSystem',
+        `Buildinfo at '${buildinfoPath}' is not valid JSON. Skipping hydration — consumer CSS will be incomplete.`,
+      )
       return
     }
 
@@ -135,7 +143,7 @@ export class PandaContext extends Generator {
   }
 
   private resolveBareSpecifier(spec: string, cwd: string): string[] {
-    const require = createRequire(join(cwd, 'noop.js'))
+    const require = createRequire(join(cwd, 'package.json'))
 
     try {
       require.resolve(`${spec}/panda.lib.json`)
@@ -178,9 +186,17 @@ export class PandaContext extends Generator {
     const pkgRoot = dirname(pkgJsonPath)
     const pkg = JSON.parse(this.runtime.fs.readFileSync(pkgJsonPath))
 
-    const fileGlobs: string[] =
-      Array.isArray(pkg.files) && pkg.files.length > 0
-        ? pkg.files.map((f: string) => {
+    // Smart-include scope: when a package declares a `dist`-ish entry in its
+    // `files` array, restrict the glob to that — including `src/` would parse
+    // the lib's TypeScript source AND its compiled output, doubling extract
+    // work and risking duplicate styles. Fall back to the broader files-array
+    // walk only when there's no recognizable build output to target.
+    const fileEntries: string[] = Array.isArray(pkg.files) ? pkg.files : []
+    const distEntry = fileEntries.find((f: string) => f === 'dist' || f.startsWith('dist/'))
+    const fileGlobs: string[] = distEntry
+      ? [distEntry.includes('.') ? distEntry : `${distEntry}/**/*.{js,mjs,cjs}`]
+      : fileEntries.length > 0
+        ? fileEntries.map((f: string) => {
             const lastSegment = f.split('/').pop() ?? ''
             const isFilePath = lastSegment.includes('.')
             return isFilePath ? f : `${f}/**/*.{js,mjs,cjs,ts,tsx}`
