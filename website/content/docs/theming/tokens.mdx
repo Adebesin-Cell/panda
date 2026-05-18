@@ -143,6 +143,23 @@ export default defineConfig({
 > NOTE 🚨: The conditions used in semantic tokens must be an at-rule or parent selector
 > [condition](/docs/concepts/conditional-styles#reference).
 
+### Hiding internal tokens from consumers
+
+When a design system is consumed via `designSystem`, the lib author can mark raw or component-layer tokens as `internal` on the preset so they don't show up in the consumer's autocomplete or generated `Tokens` types:
+
+```ts
+definePreset({
+  name: '@acme/ds/preset',
+  internal: {
+    tokens: ['colors.raw.*']
+  }
+})
+```
+
+Only the semantic layer surfaces to consumers; raw tokens stay usable inside the lib for deriving semantic values. See [Marking entries as internal](/docs/customization/presets#marking-entries-as-internal) for the full reference.
+
+Type-level enforcement is only complete with `strictTokens: true`. Without it, internal names are absent from autocomplete but TypeScript still accepts arbitrary strings.
+
 ## Token Nesting
 
 Tokens can be nested to create a hierarchy of tokens. This is useful when you want to group tokens together.

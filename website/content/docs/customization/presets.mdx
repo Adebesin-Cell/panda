@@ -100,6 +100,49 @@ export default defineConfig({
 })
 ```
 
+### Marking entries as internal
+
+Design systems usually have three layers of tokens: **raw**, **semantic**, and **component**. The lib uses all three to build itself, but only the semantic layer should be reachable from consumer code.
+
+The `internal` field on a preset marks paths that are usable inside the lib package but stripped from the consumer's generated types and IntelliSense:
+
+```ts
+// my-ds/preset.ts
+import { definePreset } from '@pandacss/dev'
+
+export default definePreset({
+  name: '@acme/ds/preset',
+  theme: {
+    extend: {
+      tokens: {
+        colors: {
+          raw: {
+            gray: { 50: { value: '#f8fafc' }, 900: { value: '#0f172a' } }
+          }
+        }
+      },
+      semanticTokens: {
+        colors: {
+          surface: { value: '{colors.raw.gray.50}' },
+          text: { value: '{colors.raw.gray.900}' }
+        }
+      }
+    }
+  },
+  internal: {
+    tokens: ['colors.raw.*']
+  }
+})
+```
+
+A consumer that references this preset via `designSystem` sees `colors.surface` and `colors.text` in autocomplete, but not `colors.raw.gray.50`. The lib itself still uses `colors.raw.gray.50` freely when defining the semantic layer.
+
+**Scope.** `internal` accepts arrays of dot-paths for any of: `tokens`, `semanticTokens`, `recipes`, `patterns`, `conditions`, `keyframes`. Paths support a single-segment `*` wildcard (`'colors.raw.*'` matches `colors.raw.gray.50` and `colors.raw.blue.500` but not `colors.raw.gray.50.alpha`).
+
+**When the filter runs.** Only presets reached through a consumer's `designSystem` field (and their transitive `presets:` chain) are filtered. Presets imported directly via `presets:[]` are user-controlled and never filtered — the lib author and the consumer are the same person.
+
+**Type enforcement.** Internal paths are removed from the generated type surface (`Tokens['colors']`, `ColorPalette`, recipe/pattern/condition keys). Full TypeScript enforcement requires `strictTokens: true` on the consumer config; without it, internal names are absent from autocomplete but TypeScript still accepts arbitrary strings on style props.
+
 ## Which panda presets will be included ?
 
 ![Visual helper](/stately-presets-merging.png)
