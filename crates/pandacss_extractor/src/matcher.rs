@@ -1,0 +1,462 @@
+use crate::{ImportRecord, ImportScanResult, ImportSpecifier, ImportSpecifierKind, Resolver};
+use regex::{Regex, RegexSet};
+use rustc_hash::{FxHashMap, FxHashSet};
+use serde::Serialize;
+use smallvec::SmallVec;
+use std::sync::Arc;
+
+pub use pandacss_tokens::TokenDictionary;
+
+/// Panda category a matched import resolves to. Mirrors the JS
+/// `ImportMap.matchers` keys in `packages/core/src/import-map.ts`.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum MatchCategory {
+    Css,
+    Recipe,
+    Pattern,
+    Jsx,
+    Tokens,
+}
+
+/// `Any` matches anything (recipes/patterns where names are user-defined);
+/// `Only(set)` restricts to an allowlist (css → css/cva/sva).
+// PERF(port): FxHashSet on short trusted keys like "css" is ~2× faster
+// than std::HashSet's SipHash.
+#[derive(Debug, Clone)]
+pub enum NameMatcher {
+    Any,
+    Only(FxHashSet<String>),
+}
+
+impl Default for NameMatcher {
+    /// Empty `Only` so a default-constructed matcher is inert, not
+    /// "accept everything".
+    fn default() -> Self {
+        Self::Only(FxHashSet::default())
+    }
+}
+
+impl NameMatcher {
+    /// `NameMatcher::only(["css", "cva"])` without the `FxHashSet::from`
+    /// boilerplate at call sites.
+    pub fn only<I, S>(names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        Self::Only(
+            names
+                .into_iter()
+                .map(|name| name.as_ref().to_owned())
+                .collect(),
+        )
+    }
+
+    #[must_use]
+    pub fn accepts(&self, name: &str) -> bool {
+        match self {
+            Self::Any => true,
+            Self::Only(set) => set.contains(name),
+        }
+    }
+}
+
+/// One category's matching rule. `modules` is substring-matched against
+/// the source import (see [`mod_matches`]).
+#[derive(Debug, Clone, Default)]
+pub struct Matcher {
+    pub modules: Vec<String>,
+    pub names: NameMatcher,
+}
+
+/// Pre-built matchers for each Panda category. Constructed by the TS
+/// bridge from `context.config.importMap` plus JSX/recipe/pattern names.
+/// Purely import-matching config — runtime extraction state lives on
+/// [`ExtractorConfig`].
+#[derive(Debug, Clone, Default)]
+pub struct Matchers {
+    pub css: Matcher,
+    pub recipe: Matcher,
+    pub pattern: Matcher,
+    pub jsx: Option<Matcher>,
+    pub tokens: Matcher,
+    /// JSX factories that accept member-chain tags like `<styled.div>`.
+    /// `None` falls back to the built-in `["styled"]`; `Some(list)`
+    /// replaces the default — useful when a preset renames the factory
+    /// or adds aliases (`panda.css` alongside `styled`).
+    pub jsx_factories: Option<Vec<String>>,
+}
+
+impl Matcher {
+    #[must_use]
+    fn accepts_module(&self, module: &str) -> bool {
+        // Substring match by design: Panda's JS ImportMap does the same
+        // so `panda/css` matches both `@my-org/panda/css` and
+        // `styled-system/css`.
+        self.modules
+            .iter()
+            .any(|candidate| module.contains(candidate.as_str()))
+    }
+}
+
+/// Full extractor configuration: import matchers plus the runtime state
+/// the extractor needs (resolved token dictionary, cross-file resolver).
+/// Separate from [`Matchers`] so the import-matching config stays small
+/// and reusable.
+#[derive(Debug, Default)]
+pub struct ExtractorConfig {
+    pub matchers: Matchers,
+    pub jsx: JsxExtractionConfig,
+    /// When `Some`, `token('x.y')` calls fold to the looked-up value.
+    pub token_dictionary: Option<Arc<TokenDictionary>>,
+    /// When `Some`, references to imported `const` exports from local
+    /// files are loaded and folded at extraction time. The resolver's
+    /// internal cache is shared across every `extract()` call that uses
+    /// this config — build once per session and reuse across the batch.
+    pub cross_file: Option<crate::CrossFileResolver>,
+}
+
+impl ExtractorConfig {
+    #[must_use]
+    pub fn new(matchers: Matchers) -> Self {
+        Self {
+            matchers,
+            jsx: JsxExtractionConfig::default(),
+            token_dictionary: None,
+            cross_file: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_jsx(mut self, jsx: JsxExtractionConfig) -> Self {
+        self.jsx = jsx.with_regex_sets();
+        self
+    }
+
+    #[must_use]
+    pub fn with_token_dictionary(mut self, dictionary: TokenDictionary) -> Self {
+        self.token_dictionary = Some(Arc::new(dictionary));
+        self
+    }
+
+    #[must_use]
+    pub fn with_cross_file(mut self, resolver: crate::CrossFileResolver) -> Self {
+        self.cross_file = Some(resolver);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum JsxStyleProps {
+    #[default]
+    All,
+    Minimal,
+    None,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct JsxExtractionConfig {
+    pub style_props: JsxStyleProps,
+    pub component_names: FxHashSet<String>,
+    pub component_regexes: Vec<Regex>,
+    pub component_regex_set: Option<RegexSet>,
+    pub component_props: FxHashMap<String, FxHashSet<String>>,
+    pub component_regex_props: Vec<(Regex, Arc<FxHashSet<String>>)>,
+    pub component_regex_prop_set: Option<RegexSet>,
+    pub component_strict: FxHashSet<String>,
+    pub component_regex_strict: Vec<Regex>,
+    pub component_regex_strict_set: Option<RegexSet>,
+    pub component_blocklist: FxHashMap<String, FxHashSet<String>>,
+    pub component_regex_blocklist: Vec<(Regex, Arc<FxHashSet<String>>)>,
+    pub component_regex_blocklist_set: Option<RegexSet>,
+    pub valid_style_props: FxHashSet<String>,
+}
+
+impl JsxExtractionConfig {
+    #[must_use]
+    pub fn with_regex_sets(mut self) -> Self {
+        self.rebuild_regex_sets();
+        self
+    }
+
+    pub fn rebuild_regex_sets(&mut self) {
+        self.component_regex_set = regex_set_from_regexes(&self.component_regexes);
+        self.component_regex_prop_set = regex_set_from_regex_pairs(&self.component_regex_props);
+        self.component_regex_strict_set = regex_set_from_regexes(&self.component_regex_strict);
+        self.component_regex_blocklist_set =
+            regex_set_from_regex_pairs(&self.component_regex_blocklist);
+    }
+
+    #[must_use]
+    pub fn has_component_matchers(&self) -> bool {
+        !self.component_names.is_empty() || !self.component_regexes.is_empty()
+    }
+
+    #[must_use]
+    pub fn is_component_tag(&self, tag_name: &str) -> bool {
+        if self.component_names.contains(tag_name) {
+            return true;
+        }
+        if let Some(regex_set) = &self.component_regex_set {
+            return regex_set.is_match(tag_name);
+        }
+        self.component_regexes
+            .iter()
+            .any(|regex| regex.is_match(tag_name))
+    }
+
+    #[must_use]
+    pub fn should_extract_prop(&self, tag_name: &str, prop_name: &str) -> bool {
+        if self.is_blocklisted_prop(tag_name, prop_name) {
+            return false;
+        }
+
+        let is_component_prop = self
+            .component_props
+            .get(tag_name)
+            .is_some_and(|props| props.contains(prop_name))
+            || self.regex_props_contain(tag_name, prop_name);
+
+        if self.is_strict_component(tag_name) {
+            return is_component_prop;
+        }
+
+        match self.style_props {
+            JsxStyleProps::All => {
+                is_component_prop
+                    || self.valid_style_props.is_empty()
+                    || self.valid_style_props.contains(prop_name)
+                    || prop_name == "css"
+                    || prop_name.ends_with("Css")
+            }
+            JsxStyleProps::Minimal => {
+                is_component_prop || prop_name == "css" || prop_name.ends_with("Css")
+            }
+            JsxStyleProps::None => is_component_prop,
+        }
+    }
+
+    fn is_strict_component(&self, tag_name: &str) -> bool {
+        if self.component_strict.contains(tag_name) {
+            return true;
+        }
+        if let Some(regex_set) = &self.component_regex_strict_set {
+            return regex_set.is_match(tag_name);
+        }
+        self.component_regex_strict
+            .iter()
+            .any(|regex| regex.is_match(tag_name))
+    }
+
+    fn is_blocklisted_prop(&self, tag_name: &str, prop_name: &str) -> bool {
+        self.component_blocklist
+            .get(tag_name)
+            .is_some_and(|props| props.contains(prop_name))
+            || self.regex_blocklist_contains(tag_name, prop_name)
+    }
+
+    fn regex_props_contain(&self, tag_name: &str, prop_name: &str) -> bool {
+        if let Some(regex_set) = &self.component_regex_prop_set {
+            return regex_set.matches(tag_name).into_iter().any(|index| {
+                self.component_regex_props
+                    .get(index)
+                    .is_some_and(|(_, props)| props.contains(prop_name))
+            });
+        }
+        self.component_regex_props
+            .iter()
+            .any(|(regex, props)| regex.is_match(tag_name) && props.contains(prop_name))
+    }
+
+    fn regex_blocklist_contains(&self, tag_name: &str, prop_name: &str) -> bool {
+        if let Some(regex_set) = &self.component_regex_blocklist_set {
+            return regex_set.matches(tag_name).into_iter().any(|index| {
+                self.component_regex_blocklist
+                    .get(index)
+                    .is_some_and(|(_, props)| props.contains(prop_name))
+            });
+        }
+        self.component_regex_blocklist
+            .iter()
+            .any(|(regex, props)| regex.is_match(tag_name) && props.contains(prop_name))
+    }
+}
+
+fn regex_set_from_regexes(regexes: &[Regex]) -> Option<RegexSet> {
+    (!regexes.is_empty())
+        .then(|| RegexSet::new(regexes.iter().map(Regex::as_str)).ok())
+        .flatten()
+}
+
+fn regex_set_from_regex_pairs(regexes: &[(Regex, Arc<FxHashSet<String>>)]) -> Option<RegexSet> {
+    (!regexes.is_empty())
+        .then(|| RegexSet::new(regexes.iter().map(|(regex, _)| regex.as_str())).ok())
+        .flatten()
+}
+
+impl Matchers {
+    /// Used by the call-site and JSX visitors to validate namespace
+    /// property names (`p.css` is OK only if `css` is in the css
+    /// matcher's allowlist).
+    #[must_use]
+    pub fn category_accepts_name(&self, category: MatchCategory, name: &str) -> bool {
+        let matcher = match category {
+            MatchCategory::Css => &self.css,
+            MatchCategory::Recipe => &self.recipe,
+            MatchCategory::Pattern => &self.pattern,
+            MatchCategory::Tokens => &self.tokens,
+            MatchCategory::Jsx => match self.jsx.as_ref() {
+                Some(m) => m,
+                None => return false,
+            },
+        };
+        matcher.names.accepts(name)
+    }
+}
+
+/// Per-file context shared between the call and JSX visitors.
+pub(crate) struct VisitorContext<'a> {
+    pub aliases: FxHashMap<&'a str, &'a MatchedImport>,
+    pub config: &'a ExtractorConfig,
+    /// `None` for staged entrypoints (`extract_calls`, `extract_jsx`)
+    /// that skip semantic-build cost; `Some` for the combined `extract()`
+    /// hot path.
+    pub resolver: Option<&'a Resolver<'a>>,
+}
+
+impl<'a> VisitorContext<'a> {
+    pub(crate) fn new(matched: &'a [MatchedImport], config: &'a ExtractorConfig) -> Self {
+        Self {
+            aliases: matched.iter().map(|m| (m.alias.as_str(), m)).collect(),
+            config,
+            resolver: None,
+        }
+    }
+
+    pub(crate) fn with_resolver(mut self, resolver: &'a Resolver<'a>) -> Self {
+        self.resolver = Some(resolver);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchedImport {
+    pub category: MatchCategory,
+    pub module: String,
+    pub name: String,
+    pub alias: String,
+    pub kind: ImportSpecifierKind,
+}
+
+#[must_use]
+pub fn match_imports(scan: &ImportScanResult, matchers: &Matchers) -> Vec<MatchedImport> {
+    match_import_records(&scan.imports, matchers)
+}
+
+/// Default and side-effect imports never match (TS does the same).
+/// Type-only imports (declaration or specifier level) are skipped.
+#[must_use]
+pub fn match_import_records(records: &[ImportRecord], matchers: &Matchers) -> Vec<MatchedImport> {
+    let index = ImportMatcherIndex::new(records, matchers);
+    let mut out = Vec::new();
+    for record in records {
+        if record.type_only {
+            continue;
+        }
+        for specifier in &record.specifiers {
+            if specifier.type_only || specifier.kind == ImportSpecifierKind::Default {
+                continue;
+            }
+            let Some(category) = index.category_for(record, specifier) else {
+                continue;
+            };
+            out.push(MatchedImport {
+                category,
+                module: record.module.clone(),
+                name: specifier.imported.clone(),
+                alias: specifier.local.clone(),
+                kind: specifier.kind,
+            });
+        }
+    }
+    out
+}
+
+struct ImportMatcherIndex<'a> {
+    source_name_categories: FxHashMap<(&'a str, &'a str, ImportSpecifierKind), MatchCategory>,
+}
+
+impl<'a> ImportMatcherIndex<'a> {
+    fn new(records: &'a [ImportRecord], matchers: &'a Matchers) -> Self {
+        let categories = active_categories(matchers);
+        let mut source_name_categories = FxHashMap::default();
+        for record in records {
+            if record.type_only {
+                continue;
+            }
+            let source_categories: SmallVec<[(MatchCategory, &Matcher); 5]> = categories
+                .iter()
+                .copied()
+                .filter(|(_, matcher)| matcher.accepts_module(&record.module))
+                .collect();
+            if source_categories.is_empty() {
+                continue;
+            }
+            for specifier in &record.specifiers {
+                if specifier.type_only || specifier.kind == ImportSpecifierKind::Default {
+                    continue;
+                }
+                let name = match specifier.kind {
+                    ImportSpecifierKind::Namespace => "*",
+                    ImportSpecifierKind::Named | ImportSpecifierKind::Default => {
+                        specifier.imported.as_str()
+                    }
+                };
+                let Some((category, _)) = source_categories.iter().find(|(_, matcher)| {
+                    specifier.kind == ImportSpecifierKind::Namespace
+                        || matcher.names.accepts(&specifier.imported)
+                }) else {
+                    continue;
+                };
+                source_name_categories
+                    .entry((record.module.as_str(), name, specifier.kind))
+                    .or_insert(*category);
+            }
+        }
+        Self {
+            source_name_categories,
+        }
+    }
+
+    fn category_for(
+        &self,
+        record: &'a ImportRecord,
+        specifier: &'a ImportSpecifier,
+    ) -> Option<MatchCategory> {
+        let name = match specifier.kind {
+            ImportSpecifierKind::Namespace => "*",
+            ImportSpecifierKind::Named | ImportSpecifierKind::Default => {
+                specifier.imported.as_str()
+            }
+        };
+        self.source_name_categories
+            .get(&(record.module.as_str(), name, specifier.kind))
+            .copied()
+    }
+}
+
+fn active_categories(matchers: &Matchers) -> SmallVec<[(MatchCategory, &Matcher); 5]> {
+    let mut categories: SmallVec<[(MatchCategory, &Matcher); 5]> = SmallVec::new();
+    categories.extend([
+        (MatchCategory::Css, &matchers.css),
+        (MatchCategory::Tokens, &matchers.tokens),
+        (MatchCategory::Recipe, &matchers.recipe),
+        (MatchCategory::Pattern, &matchers.pattern),
+    ]);
+    if let Some(jsx) = matchers.jsx.as_ref() {
+        categories.push((MatchCategory::Jsx, jsx));
+    }
+    categories
+}

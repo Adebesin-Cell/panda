@@ -1,0 +1,20 @@
+{
+  "name": "@pandacss/bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "baseline": "tsx --conditions source src/baseline.ts",
+    "binding-boundary": "tsx --conditions source src/binding-boundary.ts",
+    "extract-compare": "tsx --conditions source src/extract-compare.ts",
+    "jsx-heavy-compare": "tsx --conditions source src/jsx-heavy-compare.ts",
+    "token-dictionary-compare": "tsx --tsconfig tsconfig.json --conditions source src/token-dictionary-compare.ts"
+  },
+  "dependencies": {
+    "@pandacss/binding": "workspace:*",
+    "@pandacss/binding-wasm": "workspace:*",
+    "@pandacss/node": "workspace:*",
+    "@pandacss/token-dictionary": "workspace:*"
+  },
+  "devDependencies": {}
+}

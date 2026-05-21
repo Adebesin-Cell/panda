@@ -17,11 +17,15 @@ tsconfig.tsbuildinfo
 .DS_Store
 __generated__
 *.env
+target
+*.node
+packages/binding/native.d.ts
 .idea
 *.vsix
 .vercel
 
 ## Panda
+.panda
 styled-system
 styled-system-static
 panda
