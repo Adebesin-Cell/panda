@@ -234,3 +234,346 @@ fn a_composition_depends_on_what_its_conditional_styles_use() {
         assert!(found.contains(&token("colors.night")), "{found:?}");
     });
 }
+
+fn aliased_theme(tokens: &serde_json::Value) -> UserConfig {
+    config(json!({
+        "conditions": { "hover": "&:hover" },
+        "utilities": {
+            "color": { "className": "c", "values": "colors" },
+            "borderColor": { "className": "bc", "values": "colors" }
+        },
+        "theme": {
+            "tokens": { "colors": { "semantic": { "text": tokens } } },
+            "semanticTokens": {
+                "colors": { "fg": { "value": "{colors.semantic.text.neutral.main}" } }
+            }
+        }
+    }))
+}
+
+fn canonical_first() -> UserConfig {
+    aliased_theme(&json!({
+        "neutral": { "main": { "value": "#111" } },
+        "neutralMain": { "value": "#111", "deprecated": true }
+    }))
+}
+
+fn deprecated_first() -> UserConfig {
+    aliased_theme(&json!({
+        "neutralMain": { "value": "#111", "deprecated": true },
+        "neutral": { "main": { "value": "#111" } }
+    }))
+}
+
+#[test]
+fn a_token_is_reported_by_its_written_path_when_a_later_alias_shares_its_variable() {
+    references_for(&canonical_first(), |references| {
+        assert_eq!(
+            references.property("color", &json!("semantic.text.neutral.main")),
+            [
+                StyleReference::Utility("color".to_owned()),
+                token("colors.semantic.text.neutral.main")
+            ]
+        );
+    });
+}
+
+#[test]
+fn a_deprecated_alias_is_reported_by_its_written_path_when_declared_first() {
+    references_for(&deprecated_first(), |references| {
+        assert_eq!(
+            references.property("color", &json!("semantic.text.neutralMain")),
+            [
+                StyleReference::Utility("color".to_owned()),
+                token("colors.semantic.text.neutralMain")
+            ]
+        );
+    });
+}
+
+#[test]
+fn a_canonical_token_is_reported_by_its_written_path_when_the_alias_is_declared_first() {
+    references_for(&deprecated_first(), |references| {
+        assert_eq!(
+            references.property("color", &json!("semantic.text.neutral.main")),
+            [
+                StyleReference::Utility("color".to_owned()),
+                token("colors.semantic.text.neutral.main")
+            ]
+        );
+    });
+}
+
+#[test]
+fn a_braced_token_reference_keeps_its_written_path_when_an_alias_shares_its_variable() {
+    references_for(&canonical_first(), |references| {
+        let found = references.property(
+            "border",
+            &json!("1px solid {colors.semantic.text.neutral.main}"),
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+        assert!(
+            !found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+    });
+}
+
+#[test]
+fn a_semantic_token_depends_on_the_path_it_was_defined_with_when_an_alias_shares_its_variable() {
+    references_for(&canonical_first(), |references| {
+        assert_eq!(
+            references.dependencies(&token("colors.fg")),
+            [token("colors.semantic.text.neutral.main")]
+        );
+    });
+}
+
+#[test]
+fn both_aliases_written_in_one_value_are_both_reported() {
+    references_for(&canonical_first(), |references| {
+        let found = references.property(
+            "background",
+            &json!("linear-gradient({colors.semantic.text.neutralMain}, {colors.semantic.text.neutral.main})"),
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+    });
+}
+
+#[test]
+fn both_aliases_written_in_one_value_in_reverse_order_are_both_reported() {
+    references_for(&canonical_first(), |references| {
+        let found = references.property(
+            "background",
+            &json!("linear-gradient({colors.semantic.text.neutral.main}, {colors.semantic.text.neutralMain})"),
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+    });
+}
+
+#[test]
+fn both_aliases_written_under_conditions_of_one_property_are_both_reported() {
+    references_for(&canonical_first(), |references| {
+        let found = references.property(
+            "color",
+            &json!({ "base": "semantic.text.neutralMain", "_hover": "semantic.text.neutral.main" }),
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+    });
+}
+
+#[test]
+fn both_aliases_written_under_conditions_of_one_property_in_reverse_order_are_both_reported() {
+    references_for(&canonical_first(), |references| {
+        let found = references.property(
+            "color",
+            &json!({ "base": "semantic.text.neutral.main", "_hover": "semantic.text.neutralMain" }),
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+    });
+}
+
+fn conditional_alias_theme(base: &str, dark: &str) -> UserConfig {
+    config(json!({
+        "conditions": { "dark": "&.dark" },
+        "utilities": { "color": { "className": "c", "values": "colors" } },
+        "theme": {
+            "tokens": { "colors": { "semantic": { "text": {
+                "neutral": { "main": { "value": "#111" } },
+                "neutralMain": { "value": "#111", "deprecated": true }
+            } } } },
+            "semanticTokens": {
+                "colors": { "fg": { "value": { "base": base, "_dark": dark } } }
+            }
+        }
+    }))
+}
+
+#[test]
+fn a_conditional_semantic_token_depends_on_both_aliases_it_names() {
+    let config = conditional_alias_theme(
+        "{colors.semantic.text.neutralMain}",
+        "{colors.semantic.text.neutral.main}",
+    );
+    references_for(&config, |references| {
+        let found = references.dependencies(&token("colors.fg"));
+        assert!(
+            found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+    });
+}
+
+#[test]
+fn a_conditional_semantic_token_depends_on_both_aliases_it_names_in_reverse_order() {
+    let config = conditional_alias_theme(
+        "{colors.semantic.text.neutral.main}",
+        "{colors.semantic.text.neutralMain}",
+    );
+    references_for(&config, |references| {
+        let found = references.dependencies(&token("colors.fg"));
+        assert!(
+            found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+    });
+}
+
+fn composition_theme(lead: &serde_json::Value) -> UserConfig {
+    config(json!({
+        "conditions": { "hover": "&:hover" },
+        "utilities": { "color": { "className": "c", "shorthand": "c", "values": "colors" } },
+        "theme": {
+            "tokens": { "colors": { "semantic": { "text": {
+                "neutral": { "main": { "value": "#111" } },
+                "neutralMain": { "value": "#111", "deprecated": true }
+            } } } },
+            "textStyles": { "lead": { "value": lead } }
+        }
+    }))
+}
+
+#[test]
+fn a_composition_does_not_depend_on_an_alias_its_shorthand_overrides() {
+    let config = composition_theme(&json!({
+        "color": "semantic.text.neutralMain",
+        "c": "semantic.text.neutral.main"
+    }));
+    references_for(&config, |references| {
+        let found =
+            references.dependencies(&StyleReference::Composition("textStyles.lead".to_owned()));
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+        assert!(
+            !found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+    });
+}
+
+#[test]
+fn a_composition_does_not_depend_on_an_alias_its_longhand_overrides() {
+    let config = composition_theme(&json!({
+        "c": "semantic.text.neutralMain",
+        "color": "semantic.text.neutral.main"
+    }));
+    references_for(&config, |references| {
+        let found =
+            references.dependencies(&StyleReference::Composition("textStyles.lead".to_owned()));
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+        assert!(
+            !found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+    });
+}
+
+#[test]
+fn a_composition_depends_on_both_aliases_when_conditions_keep_both() {
+    let config = composition_theme(&json!({
+        "color": "semantic.text.neutralMain",
+        "_hover": { "c": "semantic.text.neutral.main" }
+    }));
+    references_for(&config, |references| {
+        let found =
+            references.dependencies(&StyleReference::Composition("textStyles.lead".to_owned()));
+        assert!(
+            found.contains(&token("colors.semantic.text.neutral.main")),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&token("colors.semantic.text.neutralMain")),
+            "{found:?}"
+        );
+    });
+}
+
+fn recipe_token_requirements(base: &serde_json::Value) -> String {
+    let config = config(json!({
+        "importMap": { "recipe": ["@panda/recipes"] },
+        "utilities": { "color": { "className": "c", "shorthand": "c", "values": "colors" } },
+        "theme": {
+            "tokens": { "colors": { "semantic": { "text": {
+                "neutral": { "main": { "value": "#111" } },
+                "neutralMain": { "value": "#111", "deprecated": true }
+            } } } },
+            "recipes": { "label": { "className": "label", "base": base } }
+        }
+    }));
+    let mut project = crate::common::project_with_source(
+        &config,
+        "import { label } from '@panda/recipes'; label();",
+    );
+    let snapshots = project.stylesheet_snapshots(&config);
+    pandacss_stylesheet::collect_style_requirements(&crate::common::project_input(
+        &config, &snapshots,
+    ))
+    .requirements
+    .iter()
+    .filter(|requirement| requirement.kind == "token")
+    .map(|requirement| requirement.name.clone())
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+#[test]
+fn a_recipe_does_not_require_an_alias_its_shorthand_overrides() {
+    let tokens = recipe_token_requirements(&json!({
+        "color": "semantic.text.neutralMain",
+        "c": "semantic.text.neutral.main"
+    }));
+    assert_eq!(tokens, "colors.semantic.text.neutral.main");
+}
+
+#[test]
+fn a_recipe_does_not_require_an_alias_its_longhand_overrides() {
+    let tokens = recipe_token_requirements(&json!({
+        "c": "semantic.text.neutralMain",
+        "color": "semantic.text.neutral.main"
+    }));
+    assert_eq!(tokens, "colors.semantic.text.neutral.main");
+}
