@@ -324,3 +324,31 @@ fn reports_astro_and_mdx_markup_attributes() {
     value css.p `gap`
     ");
 }
+
+#[test]
+fn a_tag_rule_with_props_keeps_dynamic_values_from_earlier_tags() {
+    use pandacss_extractor::{JsxTagAction, JsxTagRule, NamePattern};
+    use std::sync::Arc;
+
+    let mut config = jsx_config();
+    let mut jsx = config.jsx.clone();
+    jsx.tag_rules.push(JsxTagRule {
+        tag: Some(NamePattern::Exact("Stack".into())),
+        from: None,
+        action: JsxTagAction::Include(Some(Arc::new(["gap".to_owned()].into_iter().collect()))),
+    });
+    config = config.with_jsx(jsx);
+    let source = indoc! {r#"
+        <script setup lang="ts">
+        import { Box, Stack } from '@panda/jsx';
+        </script>
+        <template>
+          <Box :color="tone" />
+          <Stack :gap="space" :color="ignored" />
+        </template>
+    "#};
+    assert_snapshot!(dynamic_values(source, "Card.vue", &config), @"
+    value color `tone`
+    value gap `space`
+    ");
+}

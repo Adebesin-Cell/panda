@@ -168,13 +168,12 @@ impl TemplateContext<'_> {
             return;
         }
         if let Some(props) = resolved.props {
-            let mut index = before;
-            dynamic.retain(|value| {
-                let keep =
-                    index < before || value.path.first().is_some_and(|key| props.contains(key));
-                index += 1;
-                keep
-            });
+            let added = dynamic.split_off(before);
+            dynamic.extend(
+                added
+                    .into_iter()
+                    .filter(|value| value.path.first().is_some_and(|key| props.contains(key))),
+            );
         }
     }
 
