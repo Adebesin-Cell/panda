@@ -2,16 +2,17 @@ use std::sync::LazyLock;
 
 use pandacss_config::UserConfig;
 use pandacss_encoder::{Atom, AtomValue, RecipeStyleGroupSnapshot};
+use pandacss_literal::Literal;
 use pandacss_shared::hyphenate_property;
 use pandacss_tokens::{TokenCategory, TokenDictionary};
 use pandacss_utility::Utility;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde_json::Value;
 
 use super::{
     EmitContext, ReferenceSink, UtilityStyleOverrides, collect_css_var_refs,
     collect_token_reference_vars, composition_prop, composition_style_object,
-    is_animation_property,
+    is_animation_property, raw_css_var_name, visit_token_reference_paths,
 };
 
 /// A configured asset that a style reads.
@@ -110,6 +111,9 @@ impl<'a> StyleReferences<'a> {
                 );
 
                 for token in values {
+                    if let Some(original) = token.original_value.as_deref() {
+                        sink.write_paths_in(original);
+                    }
                     if animation {
                         sink.declaration("animation", &token.value);
                     } else {
@@ -177,6 +181,7 @@ impl<'a> StyleReferences<'a> {
             owner: self,
             seen: FxHashSet::default(),
             references: Vec::new(),
+            written: FxHashMap::default(),
         };
 
         walk(&self.cx, &mut sink);
@@ -210,12 +215,41 @@ struct ReferenceCollector<'r, 'a> {
     owner: &'r StyleReferences<'a>,
     seen: FxHashSet<StyleReference>,
     references: Vec<StyleReference>,
+    /// Variable → every token path written for the value being resolved next. Aliases
+    /// can share a variable, so the variable alone can't say which ones were written.
+    written: FxHashMap<String, Vec<String>>,
 }
 
 impl ReferenceCollector<'_, '_> {
     fn push(&mut self, reference: StyleReference) {
         if self.seen.insert(reference.clone()) {
             self.references.push(reference);
+        }
+    }
+
+    fn write_path(&mut self, path: &str) {
+        let Some(var) = self
+            .owner
+            .dictionary
+            .and_then(|dictionary| dictionary.get_var_str(path, None))
+            .and_then(raw_css_var_name)
+        else {
+            return;
+        };
+        let paths = self.written.entry(var.to_owned()).or_default();
+        if !paths.iter().any(|written| written == path) {
+            paths.push(path.to_owned());
+        }
+    }
+
+    fn write_paths_in(&mut self, value: &str) {
+        visit_token_reference_paths(value, &mut |path| self.write_path(path));
+    }
+
+    fn token_paths(&self, var: &str) -> Vec<String> {
+        match self.written.get(var) {
+            Some(paths) => paths.clone(),
+            None => self.owner.token_path(var).into_iter().collect(),
         }
     }
 
@@ -240,20 +274,39 @@ impl ReferenceSink for ReferenceCollector<'_, '_> {
         }
     }
 
+    fn authored_declaration(&mut self, prop: &str, value: &str, authored: &[(&str, &str)]) {
+        for (authored_prop, authored_value) in authored {
+            let literal = Literal::String((*authored_value).to_owned());
+            if let Some(resolved) = self
+                .owner
+                .cx
+                .utility
+                .resolve_utility_value(authored_prop, &literal)
+            {
+                for path in &resolved.tokens {
+                    self.write_path(path);
+                }
+            }
+        }
+        self.declaration(prop, value);
+    }
+
     fn value(&mut self, value: &str) {
+        self.write_paths_in(value);
         let mut vars = FxHashSet::default();
         collect_css_var_refs(value, &mut vars);
         collect_token_reference_vars(value, self.owner.dictionary, &mut vars);
 
         let mut paths = vars
             .iter()
-            .filter_map(|var| self.owner.token_path(var))
+            .flat_map(|var| self.token_paths(var))
             .collect::<Vec<_>>();
         paths.sort_unstable();
 
         for path in paths {
             self.push(StyleReference::Token(path));
         }
+        self.written.clear();
     }
 
     fn property(&mut self, prop: &str) {

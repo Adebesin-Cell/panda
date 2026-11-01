@@ -943,6 +943,11 @@ pub(crate) trait ReferenceSink {
     fn value(&mut self, value: &str);
     /// An authored style key, before lowering.
     fn property(&mut self, _prop: &str) {}
+    /// A lowered declaration with the authored `(prop, value)` pairs that produced it,
+    /// whose token paths lowering turned into variables.
+    fn authored_declaration(&mut self, prop: &str, value: &str, _authored: &[(&str, &str)]) {
+        self.declaration(prop, value);
+    }
     /// A `textStyle`, `layerStyle`, or `animationStyle` value.
     fn composition(&mut self, _prop: &'static str, _name: &str) {}
     /// Emission lowers composition styles in place; reports keep them as one reference.
@@ -1029,9 +1034,16 @@ fn collect_token_reference_vars(
     let Some(token_dictionary) = token_dictionary else {
         return;
     };
-    collect_wrapped_token_reference_vars(value, token_dictionary, refs);
-    collect_token_function_vars(value, token_dictionary, refs);
-    collect_direct_token_reference_var(value, token_dictionary, refs);
+    visit_token_reference_paths(value, &mut |path| {
+        collect_token_path_var(path, token_dictionary, refs);
+    });
+}
+
+/// Token paths a value names: `{colors.red.500}`, `token(colors.red.500)`, or a bare path.
+fn visit_token_reference_paths(value: &str, visit: &mut impl FnMut(&str)) {
+    visit_wrapped_token_reference_paths(value, visit);
+    visit_token_function_paths(value, visit);
+    visit_direct_token_reference_path(value, visit);
 }
 
 fn collect_token_ref_vars(
@@ -1047,31 +1059,19 @@ fn collect_token_ref_vars(
     }
 }
 
-fn collect_wrapped_token_reference_vars(
-    value: &str,
-    token_dictionary: &TokenDictionary,
-    refs: &mut FxHashSet<String>,
-) {
+fn visit_wrapped_token_reference_paths(value: &str, visit: &mut impl FnMut(&str)) {
     let mut rest = value;
     while let Some(start) = rest.find('{') {
         let after_open = &rest[start + 1..];
         let Some(end) = after_open.find('}') else {
             return;
         };
-        collect_token_path_var(
-            strip_token_modifier(after_open[..end].trim()),
-            token_dictionary,
-            refs,
-        );
+        visit(strip_token_modifier(after_open[..end].trim()));
         rest = &after_open[end + 1..];
     }
 }
 
-fn collect_token_function_vars(
-    value: &str,
-    token_dictionary: &TokenDictionary,
-    refs: &mut FxHashSet<String>,
-) {
+fn visit_token_function_paths(value: &str, visit: &mut impl FnMut(&str)) {
     let mut rest = value;
     while let Some(start) = rest.find("token(") {
         let after_open = &rest[start + "token(".len()..];
@@ -1081,22 +1081,18 @@ fn collect_token_function_vars(
         let path = after_open[..end]
             .split_once(',')
             .map_or(after_open[..end].trim(), |(path, _)| path.trim());
-        collect_token_path_var(strip_token_modifier(path), token_dictionary, refs);
+        visit(strip_token_modifier(path));
         rest = &after_open[end + 1..];
     }
 }
 
-fn collect_direct_token_reference_var(
-    value: &str,
-    token_dictionary: &TokenDictionary,
-    refs: &mut FxHashSet<String>,
-) {
+fn visit_direct_token_reference_path(value: &str, visit: &mut impl FnMut(&str)) {
     let trimmed = value.trim();
     if trimmed
         .bytes()
         .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
     {
-        collect_token_path_var(strip_token_modifier(trimmed), token_dictionary, refs);
+        visit(strip_token_modifier(trimmed));
     }
 }
 
@@ -1278,9 +1274,11 @@ impl<'a> EmitContext<'a> {
             entries.push(entry.clone());
         }
 
-        for rule in self.recipe_group_rules(&group.class_name, &group.conditions, &entries) {
-            Self::collect_declarations_usage(&rule.declarations, sink);
-        }
+        let entries = self.expand_recipe_style_entries(&entries);
+        let targets = self.recipe_group_targets(&group.class_name, &group.conditions);
+        let rules =
+            self.style_rules_for_expanded_entries(&targets, &entries, InheritedImportance::Normal);
+        Self::collect_entry_rules_usage(&rules, &entries, sink);
     }
 
     /// One diagnostic per distinct dropped `firstThatWorks(...)` value.
@@ -1358,13 +1356,14 @@ impl<'a> EmitContext<'a> {
         let Some(raw) = raw.as_deref() else {
             return;
         };
+        let authored = [(atom.prop(), raw)];
 
         // Expand like emission does, or a member's tokens look unused and get pruned.
         if let Some(members) = parse_first_that_works_value(raw)
             && let Some(declarations) =
                 self.first_that_works_declarations(atom.prop(), &members, atom.important())
         {
-            Self::collect_declarations_usage(&declarations, sink);
+            Self::collect_declarations_usage(&declarations, &authored, sink);
             return;
         }
 
@@ -1388,16 +1387,20 @@ impl<'a> EmitContext<'a> {
             return;
         }
 
-        Self::collect_literal_usage(&result.styles, sink);
+        Self::collect_literal_usage(&result.styles, &authored, sink);
     }
 
-    fn collect_literal_usage(styles: &Literal, sink: &mut impl ReferenceSink) {
+    fn collect_literal_usage(
+        styles: &Literal,
+        authored: &[(&str, &str)],
+        sink: &mut impl ReferenceSink,
+    ) {
         let Literal::Object(entries) = styles else {
             return;
         };
         for (prop, value) in entries {
             if let Some(value) = literal_to_css(prop, value, None) {
-                sink.declaration(&hyphenate_property(prop), value.as_ref());
+                sink.authored_declaration(&hyphenate_property(prop), value.as_ref(), authored);
             }
         }
     }
@@ -1421,6 +1424,12 @@ impl<'a> EmitContext<'a> {
         };
         for (key, value) in entries {
             sink.property(self.utility.resolve_shorthand(key));
+            let mut written = Vec::new();
+            visit_scalar_strings(value, &mut |value| written.push(value.to_owned()));
+            let authored = written
+                .iter()
+                .map(|value| (key.as_str(), value.as_str()))
+                .collect::<Vec<_>>();
 
             if let Some(prop) = composition_prop(key) {
                 visit_scalar_strings(value, &mut |name| sink.composition(prop, name));
@@ -1453,9 +1462,13 @@ impl<'a> EmitContext<'a> {
                     &mut declarations,
                     &mut conditional_declarations,
                 ) {
-                    Self::collect_declarations_usage(&declarations, sink);
+                    Self::collect_declarations_usage(&declarations, &authored, sink);
                     for conditional in conditional_declarations {
-                        Self::collect_declarations_usage(&conditional.declarations, sink);
+                        Self::collect_declarations_usage(
+                            &conditional.declarations,
+                            &authored,
+                            sink,
+                        );
                     }
                     continue;
                 }
@@ -1466,7 +1479,7 @@ impl<'a> EmitContext<'a> {
             }
 
             if let Some(declarations) = self.serialized_property_declarations(key, value) {
-                Self::collect_declarations_usage(&declarations, sink);
+                Self::collect_declarations_usage(&declarations, &authored, sink);
             } else {
                 visit_value_strings(value, sink);
             }
@@ -1485,9 +1498,32 @@ impl<'a> EmitContext<'a> {
         }
     }
 
-    fn collect_declarations_usage(declarations: &[Declaration], sink: &mut impl ReferenceSink) {
+    fn collect_declarations_usage(
+        declarations: &[Declaration],
+        authored: &[(&str, &str)],
+        sink: &mut impl ReferenceSink,
+    ) {
         for declaration in declarations {
-            sink.declaration(&declaration.prop, &declaration.value);
+            sink.authored_declaration(&declaration.prop, &declaration.value, authored);
+        }
+    }
+
+    /// Each surviving declaration carries only the entry that wrote it, so a value an
+    /// override discarded is never reported.
+    fn collect_entry_rules_usage(
+        rules: &[StyleRule],
+        entries: &[RecipeStyleEntry],
+        sink: &mut impl ReferenceSink,
+    ) {
+        for declaration in rules.iter().flat_map(|rule| &rule.declarations) {
+            let entry = entries
+                .iter()
+                .find(|entry| entry.authored_order == declaration.authored_order);
+            let value = entry.and_then(|entry| atom_value_to_string(&entry.value));
+            let authored = entry
+                .zip(value.as_deref())
+                .map(|(entry, value)| (entry.prop.as_ref(), value));
+            sink.authored_declaration(&declaration.prop, &declaration.value, authored.as_slice());
         }
     }
 
@@ -1515,10 +1551,10 @@ impl<'a> EmitContext<'a> {
         for entry in entries {
             sink.property(self.utility.resolve_shorthand(&entry.prop));
         }
+        let entries = self.expand_recipe_style_entries(entries);
         let base_rule = LoweredTarget::new("&");
-        for rule in self.style_rules_for_entries(&[base_rule], entries, importance) {
-            Self::collect_declarations_usage(&rule.declarations, sink);
-        }
+        let rules = self.style_rules_for_expanded_entries(&[base_rule], &entries, importance);
+        Self::collect_entry_rules_usage(&rules, &entries, sink);
     }
 
     fn group_atoms(&self, atoms: &[SortedAtom<'_>]) -> GroupNode {
@@ -1713,11 +1749,20 @@ impl<'a> EmitContext<'a> {
         importance: InheritedImportance,
     ) -> Vec<StyleRule> {
         let entries = self.expand_recipe_style_entries(entries);
+        self.style_rules_for_expanded_entries(base_rules, &entries, importance)
+    }
+
+    fn style_rules_for_expanded_entries(
+        &self,
+        base_rules: &[LoweredTarget],
+        entries: &[RecipeStyleEntry],
+        importance: InheritedImportance,
+    ) -> Vec<StyleRule> {
         let mut rules = AuthoredRules::default();
 
         for (index, entry) in self
             .sort
-            .sorted_recipe_entries(&entries)
+            .sorted_recipe_entries(entries)
             .into_iter()
             .enumerate()
         {
@@ -2240,20 +2285,27 @@ impl<'a> EmitContext<'a> {
         class_conditions: &[Box<str>],
         entries: &[RecipeStyleEntry],
     ) -> Vec<StyleRule> {
+        let targets = self.recipe_group_targets(class_name, class_conditions);
+        self.style_rules_for_entries(&targets, entries, InheritedImportance::Normal)
+    }
+
+    fn recipe_group_targets(
+        &self,
+        class_name: &str,
+        class_conditions: &[Box<str>],
+    ) -> Vec<LoweredTarget> {
         let class_conditions = condition_names(class_conditions);
         // Class conditions preserve runtime class-name order; rule conditions
         // are separately sorted for cascade before selector lowering.
         let rule_conditions = self.sort.sorted_condition_refs(&class_conditions);
-        let base_rules = self.lower_target(
+        self.lower_target(
             Target::Class {
                 name: class_name,
                 conditions: &class_conditions,
                 important: false,
             },
             &rule_conditions,
-        );
-
-        self.style_rules_for_entries(&base_rules, entries, InheritedImportance::Normal)
+        )
     }
 
     #[must_use]
