@@ -83,23 +83,103 @@ impl Literal {
         }
     }
 
+    /// One copy per runtime value of the first `Conditional` in the tree, or `None` when there is none.
+    #[must_use]
+    pub fn split_first_branch(&self) -> Option<Vec<Self>> {
+        match self {
+            Self::Conditional(_) => Some(self.runtime_values().into_iter().cloned().collect()),
+            Self::Object(entries) => entries.iter().enumerate().find_map(|(index, (_, value))| {
+                let variants = value.split_first_branch()?;
+                Some(
+                    variants
+                        .into_iter()
+                        .map(|variant| {
+                            let mut entries = entries.clone();
+                            entries[index].1 = variant;
+                            Self::Object(entries)
+                        })
+                        .collect(),
+                )
+            }),
+            Self::Array(items) => items.iter().enumerate().find_map(|(index, item)| {
+                let variants = item.split_first_branch()?;
+                Some(
+                    variants
+                        .into_iter()
+                        .map(|variant| {
+                            let mut items = items.clone();
+                            items[index] = variant;
+                            Self::Array(items)
+                        })
+                        .collect(),
+                )
+            }),
+            _ => None,
+        }
+    }
+
     /// True if this is a String or Token (behaves like a string for coercion/equality).
     #[must_use]
     pub fn is_string_like(&self) -> bool {
         matches!(self, Self::String(_) | Self::Token { .. })
     }
 
-    /// Truthiness per JS semantics: `null` and `false` are falsy, everything else is truthy.
-    /// Objects and arrays are always truthy; numbers are falsy only at 0 or NaN.
     #[must_use]
-    pub fn is_truthy(&self) -> bool {
+    pub fn truthiness(&self) -> Option<bool> {
+        self.decide(&mut |value| {
+            Some(match value {
+                Self::Null => false,
+                Self::Bool(b) => *b,
+                Self::Number(n) => *n != 0.0 && !n.is_nan(),
+                Self::String(s) | Self::Token { value: s, .. } => !s.is_empty(),
+                Self::Object(_) | Self::Array(_) | Self::Conditional(_) => true,
+            })
+        })
+    }
+
+    #[must_use]
+    pub fn nullishness(&self) -> Option<bool> {
+        self.decide(&mut |value| Some(matches!(value, Self::Null)))
+    }
+
+    /// Every value this could be at runtime, with nested `Conditional`s flattened.
+    #[must_use]
+    pub fn runtime_values(&self) -> Vec<&Self> {
         match self {
-            Self::Null => false,
-            Self::Bool(b) => *b,
-            Self::Number(n) => *n != 0.0 && !n.is_nan(),
-            Self::String(s) | Self::Token { value: s, .. } => !s.is_empty(),
-            Self::Object(_) | Self::Array(_) | Self::Conditional(_) => true,
+            Self::Conditional(branches) => branches.iter().flat_map(Self::runtime_values).collect(),
+            value => vec![value],
         }
+    }
+
+    /// The runtime values `a || b` (`Or`) or `a ?? b` (`Coalesce`) can return from `a`.
+    #[must_use]
+    pub fn values_kept_by_default(&self, nullish_only: bool) -> Vec<&Self> {
+        self.runtime_values()
+            .into_iter()
+            .filter(|value| {
+                if nullish_only {
+                    value.nullishness() != Some(true)
+                } else {
+                    value.truthiness() != Some(false)
+                }
+            })
+            .collect()
+    }
+
+    /// `f` for every runtime value; a `Conditional` is decided only when its branches agree.
+    pub fn decide(&self, f: &mut impl FnMut(&Self) -> Option<bool>) -> Option<bool> {
+        let Self::Conditional(branches) = self else {
+            return f(self);
+        };
+        let mut decided = None;
+        for branch in branches {
+            let value = branch.decide(f)?;
+            if decided.is_some_and(|previous| previous != value) {
+                return None;
+            }
+            decided = Some(value);
+        }
+        decided
     }
 
     /// Look up a member by key in an Object or Array.
